@@ -40,7 +40,17 @@ cd chrome-profile-tool
 npm install
 ```
 
-3. Install Playwright browsers:
+3. Configure environment variables:
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your GoLogin API token
+# Get your API token from https://app.gologin.com/
+GOLOGIN_API_TOKEN=your_api_token_here
+```
+
+4. Install Playwright browsers:
 ```bash
 npx playwright install chromium
 ```
