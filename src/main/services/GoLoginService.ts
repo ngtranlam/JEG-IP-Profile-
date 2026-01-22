@@ -434,46 +434,6 @@ export class GoLoginService {
     }
   }
 
-  // Workspace Management
-  async listWorkspaces(): Promise<any[]> {
-    try {
-      console.log('Fetching workspaces from GoLogin API...');
-      const response = await fetch(`${this.baseUrl}/workspaces`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Workspace API response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Workspace API error response:', errorText);
-        throw new Error(`Failed to list workspaces: ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Raw workspace API response:', JSON.stringify(data, null, 2));
-      
-      // Handle different possible response structures
-      let workspaces = [];
-      if (Array.isArray(data)) {
-        workspaces = data;
-      } else if (data.data) {
-        workspaces = data.data;
-      } else if (data.workspaces) {
-        workspaces = data.workspaces;
-      }
-      
-      console.log(`Found ${workspaces.length} workspaces`);
-      return workspaces || [];
-    } catch (error) {
-      console.error('Error listing workspaces:', error);
-      throw error;
-    }
-  }
 
   // Folder Management
   async listFolders(): Promise<any[]> {

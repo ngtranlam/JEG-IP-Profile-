@@ -14,7 +14,6 @@ interface DashboardProps {
 
 export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
   const [recentProfiles, setRecentProfiles] = useState<any[]>([]);
-  const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -27,10 +26,6 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
       // Load recent profiles
       const profilesData = await window.electronAPI.gologinListProfiles(1);
       setRecentProfiles(profilesData.profiles?.slice(0, 5) || []);
-      
-      // Load workspaces
-      const workspacesData = await window.electronAPI.gologinListWorkspaces();
-      setWorkspaces(workspacesData?.slice(0, 3) || []);
       
       // Load folders
       const foldersData = await window.electronAPI.gologinListFolders();
@@ -71,13 +66,6 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
       icon: Cloud,
       color: goLoginStats.connectionStatus ? 'text-green-600' : 'text-red-600',
       bgColor: goLoginStats.connectionStatus ? 'bg-green-50' : 'bg-red-50',
-    },
-    {
-      title: 'Workspaces',
-      value: workspaces.length,
-      icon: Globe,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
     },
   ];
 
@@ -148,20 +136,9 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
         </div>
 
         <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Workspaces & Folders</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Folders</h2>
           <div className="space-y-3">
-            {workspaces.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Workspaces</h3>
-                {workspaces.map((workspace, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-accent rounded-md mb-2">
-                    <Users className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm">{workspace.name || `Workspace ${index + 1}`}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {folders.length > 0 && (
+            {folders.length > 0 ? (
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">Folders</h3>
                 {folders.map((folder, index) => (
@@ -171,9 +148,8 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
                   </div>
                 ))}
               </div>
-            )}
-            {workspaces.length === 0 && folders.length === 0 && (
-              <p className="text-muted-foreground">No workspaces or folders configured</p>
+            ) : (
+              <p className="text-muted-foreground">No folders configured</p>
             )}
           </div>
         </div>

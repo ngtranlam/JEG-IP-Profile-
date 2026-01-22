@@ -73,9 +73,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gologinStopProfile: (profileId: string) => 
     ipcRenderer.invoke('gologin:stop-profile', profileId),
   
-  gologinListWorkspaces: () => 
-    ipcRenderer.invoke('gologin:list-workspaces'),
-  
   gologinListFolders: () => 
     ipcRenderer.invoke('gologin:list-folders'),
   
@@ -125,7 +122,6 @@ declare global {
       gologinRemoveProxy: (profileId: string) => Promise<void>;
       gologinLaunchProfile: (profileId: string, options?: any) => Promise<any>;
       gologinStopProfile: (profileId: string) => Promise<void>;
-      gologinListWorkspaces: () => Promise<any[]>;
       gologinListFolders: () => Promise<any[]>;
       gologinCreateFolder: (name: string) => Promise<any>;
       gologinListTags: () => Promise<any[]>;

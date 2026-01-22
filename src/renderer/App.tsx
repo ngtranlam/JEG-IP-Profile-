@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { GoLoginProfileList } from './components/GoLoginProfileList';
-import { WorkspaceList } from './components/WorkspaceList';
 import { FolderList } from './components/FolderList';
 import { Sidebar } from './components/Sidebar';
 
-type ActiveView = 'dashboard' | 'profiles' | 'workspaces' | 'folders';
+type ActiveView = 'dashboard' | 'profiles' | 'folders';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
@@ -60,12 +59,6 @@ function App() {
           <GoLoginProfileList
             onProfileLaunch={(profileId) => console.log('GoLogin profile launched:', profileId)}
             onRefresh={loadGoLoginData}
-          />
-        );
-      case 'workspaces':
-        return (
-          <WorkspaceList
-            onWorkspaceSelect={(workspaceId) => console.log('Workspace selected:', workspaceId)}
           />
         );
       case 'folders':

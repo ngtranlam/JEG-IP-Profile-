@@ -1,17 +1,16 @@
 import React from 'react';
-import { LayoutDashboard, Cloud, Settings, FolderOpen, Users2 } from 'lucide-react';
+import { LayoutDashboard, Cloud, Settings, FolderOpen } from 'lucide-react';
 import iegLogo from '../assets/ieg_logo.png';
 
 interface SidebarProps {
-  activeView: 'dashboard' | 'profiles' | 'workspaces' | 'folders';
-  onViewChange: (view: 'dashboard' | 'profiles' | 'workspaces' | 'folders') => void;
+  activeView: 'dashboard' | 'profiles' | 'folders';
+  onViewChange: (view: 'dashboard' | 'profiles' | 'folders') => void;
 }
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profiles', label: 'Profiles', icon: Cloud },
-    { id: 'workspaces', label: 'Workspaces', icon: Users2 },
     { id: 'folders', label: 'Folders', icon: FolderOpen },
   ];
 
@@ -34,7 +33,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'workspaces' | 'folders')}
+                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders')}
                   className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground'

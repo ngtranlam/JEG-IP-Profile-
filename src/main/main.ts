@@ -1,34 +1,20 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { DatabaseManager } from './database/DatabaseManager';
-import { ProfileManager } from './managers/ProfileManager';
-import { ProxyManager } from './managers/ProxyManager';
-import { GoLoginService } from './services/GoLoginService';
+import { ApiService } from './services/ApiService';
 
-dotenv.config();
+// Load .env from project root (2 levels up from dist/main/main/)
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 class ChromeProfileTool {
   private mainWindow: BrowserWindow | null = null;
-  private databaseManager: DatabaseManager;
-  private profileManager: ProfileManager;
-  private proxyManager: ProxyManager;
-  private goLoginService: GoLoginService;
+  private apiService: ApiService;
 
   constructor() {
-    this.databaseManager = new DatabaseManager();
-    this.profileManager = new ProfileManager(this.databaseManager);
-    this.proxyManager = new ProxyManager(this.databaseManager);
-    
-    const apiToken = process.env.GOLOGIN_API_TOKEN;
-    if (!apiToken) {
-      throw new Error('GOLOGIN_API_TOKEN is not set in environment variables');
-    }
-    this.goLoginService = new GoLoginService(apiToken);
+    this.apiService = new ApiService();
   }
 
   async initialize() {
-    await this.databaseManager.initialize();
     this.setupIPC();
   }
 
@@ -68,122 +54,118 @@ class ChromeProfileTool {
   private setupIPC() {
     // Profile management IPC handlers
     ipcMain.handle('profile:create', async (_, profileData) => {
-      return await this.profileManager.createProfile(profileData);
+      return await this.apiService.createProfile(profileData);
     });
 
     ipcMain.handle('profile:update', async (_, id, updates) => {
-      return await this.profileManager.updateProfile(id, updates);
+      return await this.apiService.updateProfile(id, updates);
     });
 
     ipcMain.handle('profile:delete', async (_, id) => {
-      return await this.profileManager.deleteProfile(id);
+      return await this.apiService.deleteProfile(id);
     });
 
     ipcMain.handle('profile:list', async () => {
-      return await this.profileManager.listProfiles();
+      return await this.apiService.listProfiles();
     });
 
     ipcMain.handle('profile:launch', async (_, options) => {
-      const profile = await this.profileManager.getProfile(options.profile_id);
+      const profile = await this.apiService.getProfile(options.profile_id);
       if (!profile) {
         throw new Error('Profile not found');
       }
 
-      return await this.goLoginService.launchProfile(profile.id, { headless: options.headless });
+      return await this.apiService.gologinLaunchProfile(profile.id, { headless: options.headless });
     });
 
     // Proxy management IPC handlers
     ipcMain.handle('proxy:create', async (_, proxyData) => {
-      return await this.proxyManager.createProxy(proxyData);
+      return await this.apiService.createProxy(proxyData);
     });
 
     ipcMain.handle('proxy:update', async (_, id, updates) => {
-      return await this.proxyManager.updateProxy(id, updates);
+      return await this.apiService.updateProxy(id, updates);
     });
 
     ipcMain.handle('proxy:delete', async (_, id) => {
-      return await this.proxyManager.deleteProxy(id);
+      return await this.apiService.deleteProxy(id);
     });
 
     ipcMain.handle('proxy:list', async () => {
-      return await this.proxyManager.listProxies();
+      return await this.apiService.listProxies();
     });
 
     ipcMain.handle('proxy:validate', async (_, id) => {
-      return await this.proxyManager.validateProxy(id);
+      return await this.apiService.validateProxy(id);
     });
 
     ipcMain.handle('proxy:rotate-ip', async (_, id) => {
-      return await this.proxyManager.rotateIP(id);
+      return await this.apiService.rotateProxyIP(id);
     });
 
     ipcMain.handle('proxy:test-config', async (_, config) => {
-      return await this.proxyManager.testProxyConfig(config);
+      return await this.apiService.testProxyConfig(config);
     });
 
     // GoLogin API handlers
     ipcMain.handle('gologin:list-profiles', async (_, page, search, folder) => {
-      return await this.goLoginService.listProfiles(page, search, folder);
+      return await this.apiService.gologinListProfiles(page, search, folder);
     });
 
     ipcMain.handle('gologin:get-profile', async (_, profileId) => {
-      return await this.goLoginService.getProfile(profileId);
+      return await this.apiService.gologinGetProfile(profileId);
     });
 
     ipcMain.handle('gologin:create-profile', async (_, profileData) => {
-      return await this.goLoginService.createProfile(profileData);
+      return await this.apiService.gologinCreateProfile(profileData);
     });
 
     ipcMain.handle('gologin:create-quick-profile', async (_, os, name, osSpec) => {
-      return await this.goLoginService.createQuickProfile(os, name, osSpec);
+      return await this.apiService.gologinCreateQuickProfile(os, name, osSpec);
     });
 
     ipcMain.handle('gologin:update-profile', async (_, profileId, profileData) => {
-      return await this.goLoginService.updateProfile(profileId, profileData);
+      return await this.apiService.gologinUpdateProfile(profileId, profileData);
     });
 
     ipcMain.handle('gologin:delete-profile', async (_, profileId) => {
-      return await this.goLoginService.deleteProfile(profileId);
+      return await this.apiService.gologinDeleteProfile(profileId);
     });
 
     ipcMain.handle('gologin:set-proxy', async (_, profileId, proxy) => {
-      return await this.goLoginService.setProfileProxy(profileId, proxy);
+      return await this.apiService.gologinSetProxy(profileId, proxy);
     });
 
     ipcMain.handle('gologin:remove-proxy', async (_, profileId) => {
-      return await this.goLoginService.removeProfileProxy(profileId);
+      return await this.apiService.gologinRemoveProxy(profileId);
     });
 
     ipcMain.handle('gologin:launch-profile', async (_, profileId, options) => {
-      return await this.goLoginService.launchProfile(profileId, options);
+      return await this.apiService.gologinLaunchProfile(profileId, options);
     });
 
     ipcMain.handle('gologin:stop-profile', async (_, profileId) => {
-      return await this.goLoginService.stopProfile(profileId);
-    });
-
-    ipcMain.handle('gologin:list-workspaces', async () => {
-      return await this.goLoginService.listWorkspaces();
+      return await this.apiService.gologinStopProfile(profileId);
     });
 
     ipcMain.handle('gologin:list-folders', async () => {
-      return await this.goLoginService.listFolders();
+      return await this.apiService.gologinListFolders();
     });
 
     ipcMain.handle('gologin:create-folder', async (_, name) => {
-      return await this.goLoginService.createFolder(name);
+      return await this.apiService.gologinCreateFolder(name);
     });
 
     ipcMain.handle('gologin:list-tags', async () => {
-      return await this.goLoginService.listTags();
+      return await this.apiService.gologinListTags();
     });
 
     ipcMain.handle('gologin:get-proxy-locations', async () => {
-      return await this.goLoginService.getProxyLocations();
+      return await this.apiService.gologinGetProxyLocations();
     });
 
     ipcMain.handle('gologin:test-connection', async () => {
-      return await this.goLoginService.testConnection();
+      return await this.apiService.gologinTestConnection();
     });
   }
 }

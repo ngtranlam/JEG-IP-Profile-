@@ -1,0 +1,295 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env from project root
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
+
+export class ApiService {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = process.env.API_BASE_URL || 'http://localhost/api';
+    console.log('API Service initialized with base URL:', this.baseUrl);
+  }
+
+  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    const defaultOptions: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    };
+
+    const requestOptions = { ...defaultOptions, ...options };
+
+    try {
+      console.log(`Making API request: ${requestOptions.method || 'GET'} ${url}`);
+      
+      const response = await fetch(url, requestOptions);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`API request failed: ${url}`, error);
+      throw error;
+    }
+  }
+
+  // Profile API methods
+  async createProfile(profileData: any): Promise<any> {
+    const response = await this.makeRequest('/profiles', {
+      method: 'POST',
+      body: JSON.stringify(profileData),
+    });
+    return response.data;
+  }
+
+  async updateProfile(id: string, updates: any): Promise<any> {
+    const response = await this.makeRequest(`/profiles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return response.data;
+  }
+
+  async deleteProfile(id: string): Promise<void> {
+    await this.makeRequest(`/profiles/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getProfile(id: string): Promise<any> {
+    const response = await this.makeRequest(`/profiles/${id}`);
+    return response.data;
+  }
+
+  async listProfiles(): Promise<any[]> {
+    const response = await this.makeRequest('/profiles');
+    return response.data;
+  }
+
+  // Proxy API methods
+  async createProxy(proxyData: any): Promise<any> {
+    const response = await this.makeRequest('/proxies', {
+      method: 'POST',
+      body: JSON.stringify(proxyData),
+    });
+    return response.data;
+  }
+
+  async updateProxy(id: string, updates: any): Promise<any> {
+    const response = await this.makeRequest(`/proxies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return response.data;
+  }
+
+  async deleteProxy(id: string): Promise<void> {
+    await this.makeRequest(`/proxies/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getProxy(id: string): Promise<any> {
+    const response = await this.makeRequest(`/proxies/${id}`);
+    return response.data;
+  }
+
+  async listProxies(): Promise<any[]> {
+    const response = await this.makeRequest('/proxies');
+    return response.data;
+  }
+
+  async validateProxy(id: string): Promise<any> {
+    const response = await this.makeRequest(`/proxies/${id}/validate`, {
+      method: 'POST',
+    });
+    return response.data;
+  }
+
+  async rotateProxyIP(id: string): Promise<any> {
+    const response = await this.makeRequest(`/proxies/${id}/rotate-ip`, {
+      method: 'POST',
+    });
+    return response.data;
+  }
+
+  async testProxyConfig(config: any): Promise<any> {
+    const response = await this.makeRequest('/proxies/test-config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+    return response.data;
+  }
+
+  // GoLogin API methods
+  async gologinListProfiles(page?: number, search?: string, folder?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (page) params.append('page', page.toString());
+    if (search) params.append('search', search);
+    if (folder) params.append('folder', folder);
+    
+    const queryString = params.toString();
+    const endpoint = `/gologin${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await this.makeRequest(endpoint);
+    return response.data;
+  }
+
+  async gologinGetProfile(profileId: string): Promise<any> {
+    const response = await this.makeRequest(`/gologin/${profileId}`);
+    return response.data;
+  }
+
+  async gologinCreateProfile(profileData: any): Promise<any> {
+    const response = await this.makeRequest('/gologin', {
+      method: 'POST',
+      body: JSON.stringify(profileData),
+    });
+    return response.data;
+  }
+
+  async gologinCreateQuickProfile(os: string, name: string, osSpec?: string): Promise<any> {
+    const response = await this.makeRequest('/gologin/quick', {
+      method: 'POST',
+      body: JSON.stringify({ os, name, osSpec }),
+    });
+    return response.data;
+  }
+
+  async gologinUpdateProfile(profileId: string, profileData: any): Promise<any> {
+    const response = await this.makeRequest(`/gologin/${profileId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+    return response.data;
+  }
+
+  async gologinDeleteProfile(profileId: string): Promise<void> {
+    await this.makeRequest(`/gologin/${profileId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async gologinSetProxy(profileId: string, proxy: any): Promise<void> {
+    await this.makeRequest(`/gologin/${profileId}/set-proxy`, {
+      method: 'POST',
+      body: JSON.stringify(proxy),
+    });
+  }
+
+  async gologinRemoveProxy(profileId: string): Promise<void> {
+    await this.makeRequest(`/gologin/${profileId}/remove-proxy`, {
+      method: 'POST',
+    });
+  }
+
+  async gologinLaunchProfile(profileId: string, options?: any): Promise<any> {
+    // Launch profile must use Local Rest API, not Cloud API
+    try {
+      console.log(`Launching GoLogin profile locally: ${profileId}`);
+      
+      const response = await fetch('http://localhost:36912/browser/start-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: profileId,
+          sync: true,
+          ...options
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Local launch profile API error:', errorText);
+        throw new Error(`Failed to launch profile locally: ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Profile launched successfully:', data);
+      
+      return {
+        browser: data.browser || null,
+        wsEndpoint: data.wsUrl || '' 
+      };
+    } catch (error) {
+      console.error(`Error launching profile ${profileId}:`, error);
+      throw error;
+    }
+  }
+
+  async gologinStopProfile(profileId: string): Promise<any> {
+    // Stop profile must use Local Rest API, not Cloud API
+    try {
+      console.log(`Stopping GoLogin profile locally: ${profileId}`);
+      
+      const response = await fetch('http://localhost:36912/browser/stop-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: profileId
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Local stop profile API error:', errorText);
+        throw new Error(`Failed to stop profile locally: ${response.statusText} - ${errorText}`);
+      }
+
+      // Stop profile returns 204 No Content (empty response)
+      if (response.status === 204) {
+        console.log('Profile stopped successfully (204 No Content)');
+        return { status: 'success', message: 'Profile stopped' };
+      }
+
+      const data = await response.json();
+      console.log('Profile stopped successfully:', data);
+      return data;
+    } catch (error) {
+      console.error(`Error stopping profile ${profileId}:`, error);
+      throw error;
+    }
+  }
+
+  async gologinListFolders(): Promise<any[]> {
+    const response = await this.makeRequest('/gologin/folders');
+    return response.data;
+  }
+
+  async gologinCreateFolder(name: string): Promise<any> {
+    const response = await this.makeRequest('/gologin/folders', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    return response.data;
+  }
+
+  async gologinListTags(): Promise<any[]> {
+    const response = await this.makeRequest('/gologin/tags');
+    return response.data;
+  }
+
+  async gologinGetProxyLocations(): Promise<any[]> {
+    const response = await this.makeRequest('/gologin/proxy-locations');
+    return response.data;
+  }
+
+  async gologinTestConnection(): Promise<boolean> {
+    const response = await this.makeRequest('/gologin/test-connection', {
+      method: 'POST',
+    });
+    return response.data;
+  }
+}
