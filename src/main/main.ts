@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { ApiService } from './services/ApiService';
 import { AuthService } from './services/AuthService';
+import { AutoSyncService } from './services/AutoSyncService';
 
 // Load .env from project root (2 levels up from dist/main/main/)
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
@@ -11,11 +12,13 @@ class ChromeProfileTool {
   private mainWindow: BrowserWindow | null = null;
   private apiService: ApiService;
   private authService: AuthService;
+  private autoSyncService: AutoSyncService;
 
   constructor() {
     const apiBaseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
     this.apiService = new ApiService();
     this.authService = new AuthService(apiBaseUrl);
+    this.autoSyncService = new AutoSyncService(this.apiService, this.authService);
   }
 
   async initialize() {
@@ -172,6 +175,105 @@ class ChromeProfileTool {
       return await this.apiService.gologinTestConnection();
     });
 
+    // Local Data IPC handlers (from database)
+    ipcMain.handle('local-data:get-folders', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getLocalFolders(token);
+    });
+
+    ipcMain.handle('local-data:get-profiles', async (_, page, limit, search, folderId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getLocalProfiles(token, page, limit, search, folderId);
+    });
+
+    ipcMain.handle('local-data:get-profile', async (_, profileId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getLocalProfile(token, profileId);
+    });
+
+    ipcMain.handle('local-data:get-stats', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getLocalStats(token);
+    });
+
+    ipcMain.handle('local-data:sync', async (_, syncType) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.syncGoLoginData(token, syncType);
+    });
+
+    ipcMain.handle('local-data:sync-status', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getSyncStatus(token);
+    });
+
+    ipcMain.handle('local-data:test-connection', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.testLocalConnection(token);
+    });
+
+    // Bi-directional sync IPC handlers
+    ipcMain.handle('local-data:create-profile', async (_, profileData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.createProfileWithSync(token, profileData);
+    });
+
+    ipcMain.handle('local-data:update-profile', async (_, profileId, profileData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateProfileWithSync(token, profileId, profileData);
+    });
+
+    ipcMain.handle('local-data:delete-profile', async (_, profileId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.deleteProfileWithSync(token, profileId);
+    });
+
+    ipcMain.handle('local-data:create-folder', async (_, name) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.createFolderWithSync(token, name);
+    });
+
+    ipcMain.handle('local-data:set-proxy', async (_, profileId, proxyData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.setProxyWithSync(token, profileId, proxyData);
+    });
+
+    // Seller management IPC handlers
+    ipcMain.handle('local-data:get-sellers', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getSellers(token);
+    });
+
+    ipcMain.handle('local-data:assign-seller', async (_, folderId, sellerId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.assignSellerToFolder(token, folderId, sellerId);
+    });
+
+    ipcMain.handle('local-data:remove-seller', async (_, folderId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.removeSellerFromFolder(token, folderId);
+    });
+
+    ipcMain.handle('local-data:create-folder-with-seller', async (_, name, sellerId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.createFolderWithSeller(token, name, sellerId);
+    });
+
     // Authentication IPC handlers
     ipcMain.handle('auth:login', async (_, userName, password) => {
       try {
@@ -218,6 +320,43 @@ class ChromeProfileTool {
     ipcMain.handle('auth:has-permission', async (_, permission) => {
       return this.authService.hasPermission(permission);
     });
+
+    // Auto-sync IPC handlers
+    ipcMain.handle('auto-sync:start', async () => {
+      this.autoSyncService.start();
+      return { success: true };
+    });
+
+    ipcMain.handle('auto-sync:stop', async () => {
+      this.autoSyncService.stop();
+      return { success: true };
+    });
+
+    ipcMain.handle('auto-sync:is-active', async () => {
+      return this.autoSyncService.isActive();
+    });
+
+    ipcMain.handle('auto-sync:trigger-manual', async () => {
+      return await this.autoSyncService.triggerManualSync();
+    });
+
+    ipcMain.handle('auto-sync:set-interval', async (_, minutes) => {
+      this.autoSyncService.setSyncInterval(minutes);
+      return { success: true };
+    });
+  }
+
+  startAutoSync() {
+    // Start auto-sync service after user is authenticated
+    if (this.authService.isAuthenticated()) {
+      console.log('Starting auto-sync service...');
+      this.autoSyncService.start();
+    }
+  }
+
+  stopAutoSync() {
+    console.log('Stopping auto-sync service...');
+    this.autoSyncService.stop();
   }
 }
 
@@ -226,6 +365,9 @@ const chromeProfileTool = new ChromeProfileTool();
 app.whenReady().then(async () => {
   await chromeProfileTool.initialize();
   chromeProfileTool.createWindow();
+  
+  // Start auto-sync after window is created
+  chromeProfileTool.startAutoSync();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -241,6 +383,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', async () => {
-  // Cleanup resources
+  // Stop auto-sync and cleanup resources
   console.log('Application shutting down...');
+  chromeProfileTool.stopAutoSync();
 });

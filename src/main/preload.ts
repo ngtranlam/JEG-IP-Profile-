@@ -88,6 +88,54 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gologinTestConnection: () => 
     ipcRenderer.invoke('gologin:test-connection'),
 
+  // Local Data API methods (from database)
+  localDataGetFolders: () => 
+    ipcRenderer.invoke('local-data:get-folders'),
+  
+  localDataGetProfiles: (page?: number, limit?: number, search?: string, folderId?: string) => 
+    ipcRenderer.invoke('local-data:get-profiles', page, limit, search, folderId),
+  
+  localDataGetProfile: (profileId: string) => 
+    ipcRenderer.invoke('local-data:get-profile', profileId),
+  
+  localDataGetStats: () => 
+    ipcRenderer.invoke('local-data:get-stats'),
+  
+  localDataSync: (syncType?: 'full' | 'folders' | 'profiles') => 
+    ipcRenderer.invoke('local-data:sync', syncType),
+  
+  localDataSyncStatus: () => 
+    ipcRenderer.invoke('local-data:sync-status'),
+  
+  localDataTestConnection: () => 
+    ipcRenderer.invoke('local-data:test-connection'),
+
+  // Bi-directional sync methods
+  localDataCreateProfile: (profileData: any) => 
+    ipcRenderer.invoke('local-data:create-profile', profileData),
+  
+  localDataUpdateProfile: (profileId: string, profileData: any) => 
+    ipcRenderer.invoke('local-data:update-profile', profileId, profileData),
+  
+  localDataDeleteProfile: (profileId: string) => 
+    ipcRenderer.invoke('local-data:delete-profile', profileId),
+  
+  localDataSetProxy: (profileId: string, proxyData: any) => 
+    ipcRenderer.invoke('local-data:set-proxy', profileId, proxyData),
+
+  // Seller management methods
+  localDataGetSellers: () => 
+    ipcRenderer.invoke('local-data:get-sellers'),
+  
+  localDataAssignSeller: (folderId: string, sellerId: number) => 
+    ipcRenderer.invoke('local-data:assign-seller', folderId, sellerId),
+  
+  localDataRemoveSeller: (folderId: string) => 
+    ipcRenderer.invoke('local-data:remove-seller', folderId),
+  
+  localDataCreateFolder: (name: string, sellerId?: number) => 
+    ipcRenderer.invoke('local-data:create-folder-with-seller', name, sellerId),
+
   // Authentication
   auth: {
     login: (userName: string, password: string) => 
@@ -160,6 +208,27 @@ declare global {
       gologinListTags: () => Promise<any[]>;
       gologinTestConnection: () => Promise<boolean>;
       gologinGetProxyLocations: () => Promise<any[]>;
+      
+      // Local Data API methods
+      localDataGetFolders: () => Promise<any[]>;
+      localDataGetProfiles: (page?: number, limit?: number, search?: string, folderId?: string) => Promise<any>;
+      localDataGetProfile: (profileId: string) => Promise<any>;
+      localDataGetStats: () => Promise<any>;
+      localDataSync: (syncType?: 'full' | 'folders' | 'profiles') => Promise<any>;
+      localDataSyncStatus: () => Promise<any>;
+      localDataTestConnection: () => Promise<boolean>;
+      
+      // Bi-directional sync methods
+      localDataCreateProfile: (profileData: any) => Promise<any>;
+      localDataUpdateProfile: (profileId: string, profileData: any) => Promise<any>;
+      localDataDeleteProfile: (profileId: string) => Promise<void>;
+      localDataSetProxy: (profileId: string, proxyData: any) => Promise<void>;
+      
+      // Seller management methods
+      localDataGetSellers: () => Promise<any[]>;
+      localDataAssignSeller: (folderId: string, sellerId: number) => Promise<void>;
+      localDataRemoveSeller: (folderId: string) => Promise<void>;
+      localDataCreateFolder: (name: string, sellerId?: number) => Promise<any>;
       
       // Authentication
       auth: {

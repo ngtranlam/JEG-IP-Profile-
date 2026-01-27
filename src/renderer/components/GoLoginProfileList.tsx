@@ -22,9 +22,11 @@ interface GoLoginProfile {
 interface GoLoginProfileListProps {
   onProfileLaunch?: (profileId: string) => void;
   onRefresh?: () => Promise<void>;
+  currentUser?: any;
 }
 
-export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfileListProps) {
+export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: GoLoginProfileListProps) {
+  const isSeller = currentUser?.roles === '3';
   const [profiles, setProfiles] = useState<GoLoginProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +34,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [folders, setFolders] = useState<any[]>([]);
+  const [hasAssignedFolders, setHasAssignedFolders] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<boolean | null>(null);
   const [newProfileName, setNewProfileName] = useState('');
@@ -185,38 +188,40 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
   const loadProfiles = async () => {
     try {
       setLoading(true);
-      const result = await window.electronAPI.gologinListProfiles(
+      // Use local_data API with role-based filtering
+      const result = await window.electronAPI.localDataGetProfiles(
         currentPage,
+        50, // limit
         searchTerm || undefined,
         selectedFolder || undefined
       );
       
-      // Transform and normalize profile data from API
-      console.log('Raw profiles from API:', result.profiles);
+      // Transform and normalize profile data from database
+      console.log('Raw profiles from database:', result.profiles);
       const transformedProfiles = (result.profiles || []).map((profile: any) => ({
-        id: profile.id || profile._id,
-        name: profile.name || `Profile ${profile.id?.slice(0, 8) || 'Unknown'}`,
-        notes: profile.notes || profile.description || '',
+        id: profile.profile_id || profile.id,
+        name: profile.name || `Profile ${profile.profile_id?.slice(0, 8) || 'Unknown'}`,
+        notes: profile.notes || '',
         os: profile.os || 'win',
-        startUrl: profile.startUrl || profile.start_url || '',
-        proxyEnabled: profile.proxyEnabled || profile.proxy_enabled || !!profile.proxy,
-        proxy: profile.proxy ? {
-          mode: profile.proxy.mode || profile.proxy.type,
-          host: profile.proxy.host,
-          port: profile.proxy.port,
+        startUrl: profile.start_url || '',
+        proxyEnabled: profile.proxy_enabled === 1,
+        proxy: profile.proxy_enabled ? {
+          mode: profile.proxy_type,
+          host: profile.proxy_host,
+          port: profile.proxy_port,
         } : undefined,
-        createdAt: profile.createdAt || profile.created_at || new Date().toISOString(),
-        updatedAt: profile.updatedAt || profile.updated_at || new Date().toISOString(),
-        browserType: profile.browserType || 'chrome',
-        canBeRunning: profile.canBeRunning !== false,
+        createdAt: profile.created_at || new Date().toISOString(),
+        updatedAt: profile.updated_at || new Date().toISOString(),
+        browserType: profile.browser_type || 'chrome',
+        canBeRunning: profile.can_be_running !== 0,
       }));
       
       console.log('Transformed profiles:', transformedProfiles);
       console.log('Setting profiles state with', transformedProfiles.length, 'profiles');
       setProfiles(transformedProfiles);
-      setTotalProfiles(result.total || result.allProfilesCount || transformedProfiles.length);
+      setTotalProfiles(result.total || transformedProfiles.length);
     } catch (error) {
-      console.error('Failed to load GoLogin profiles:', error);
+      console.error('Failed to load profiles from database:', error);
       setProfiles([]);
       setTotalProfiles(0);
     } finally {
@@ -226,10 +231,19 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
 
   const loadFolders = async () => {
     try {
-      const folderList = await window.electronAPI.gologinListFolders();
+      // Use local_data API with role-based filtering
+      const folderList = await window.electronAPI.localDataGetFolders();
       setFolders(folderList || []);
+      
+      // Check if Seller has any assigned folders
+      if (isSeller) {
+        setHasAssignedFolders((folderList || []).length > 0);
+      }
     } catch (error) {
-      console.error('Failed to load folders:', error);
+      console.error('Failed to load folders from database:', error);
+      if (isSeller) {
+        setHasAssignedFolders(false);
+      }
     }
   };
 
@@ -575,8 +589,19 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              if (isSeller && !hasAssignedFolders) {
+                alert('You cannot create profiles because you have not been assigned to any folders yet. Please contact the IT department for support.');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            disabled={isSeller && !hasAssignedFolders}
+            className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
+              isSeller && !hasAssignedFolders
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
           >
             <Plus className="w-4 h-4" />
             Add profile
@@ -595,7 +620,8 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-2 py-1 text-sm border-0 bg-transparent focus:outline-none"
           />
-          {folders.length > 0 && (
+          {/* Hide folder filter for Sellers - they only see their assigned folders */}
+          {!isSeller && folders.length > 0 && (
             <select
               value={selectedFolder}
               onChange={(e) => setSelectedFolder(e.target.value)}
@@ -621,19 +647,43 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh }: GoLoginProfil
         ) : profiles.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <Globe className="w-12 h-12 mb-3" />
-            <h3 className="text-base font-medium mb-2">No profiles found</h3>
-            <p className="text-sm text-center mb-4">
-              {searchTerm || selectedFolder 
-                ? 'Try adjusting your search or filter criteria.' 
-                : 'Create your first GoLogin profile to get started.'}
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add profile
-            </button>
+            {isSeller && !hasAssignedFolders ? (
+              // Message for Seller with NO assigned folders
+              <>
+                <h3 className="text-base font-medium mb-2">No Access to Profiles</h3>
+                <p className="text-sm text-center mb-4 max-w-md">
+                  You have not been assigned access to manage any profiles yet. 
+                  Please contact the IT department for support.
+                </p>
+              </>
+            ) : isSeller && hasAssignedFolders ? (
+              // Message for Seller with assigned folders but no profiles yet
+              <>
+                <h3 className="text-base font-medium mb-2">No profiles found</h3>
+                <p className="text-sm text-center mb-4">
+                  {searchTerm 
+                    ? 'Try adjusting your search criteria.' 
+                    : 'No profiles have been created in your assigned folders yet.'}
+                </p>
+              </>
+            ) : (
+              // Message for Admin with no profiles
+              <>
+                <h3 className="text-base font-medium mb-2">No profiles found</h3>
+                <p className="text-sm text-center mb-4">
+                  {searchTerm || selectedFolder 
+                    ? 'Try adjusting your search or filter criteria.' 
+                    : 'Create your first GoLogin profile to get started.'}
+                </p>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add profile
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="min-w-full">

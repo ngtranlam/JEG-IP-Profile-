@@ -35,14 +35,13 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
 
   const loadDashboardData = async () => {
     try {
-      // Load recent profiles with better error handling
-      const profilesData = await window.electronAPI.gologinListProfiles(1);
+      // Load recent profiles from database
+      const profilesData = await window.electronAPI.localDataGetProfiles(1, 50);
       if (profilesData && profilesData.profiles) {
-        // Sort profiles by last activity and take top 5
-        const sortedProfiles = profilesData.profiles
-          .sort((a: any, b: any) => {
-            const dateA = new Date(a.lastActivity || 0).getTime();
-            const dateB = new Date(b.lastActivity || 0).getTime();
+        const sortedProfiles = [...profilesData.profiles]
+          .sort((a, b) => {
+            const dateA = new Date(a.last_activity || a.updated_at || 0).getTime();
+            const dateB = new Date(b.last_activity || b.updated_at || 0).getTime();
             return dateB - dateA;
           })
           .slice(0, 5);
@@ -51,21 +50,21 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
         setRecentProfiles([]);
       }
       
-      // Load folders with profile count - only for Admin
+      // Load folders from database - only for Admin
       if (isAdmin) {
-        const foldersData = await window.electronAPI.gologinListFolders();
+        const foldersData = await window.electronAPI.localDataGetFolders();
         if (foldersData && Array.isArray(foldersData)) {
-          // Add profile count for each folder if available
           const foldersWithCount = foldersData.map(folder => ({
             ...folder,
-            profilesCount: folder.profilesCount || 0 // Use actual count or 0
-          })).slice(0, 4); // Show up to 4 folders
+            id: folder.folder_id,
+            name: folder.name,
+            profilesCount: folder.profilesCount || 0
+          })).slice(0, 4);
           setFolders(foldersWithCount);
         } else {
           setFolders([]);
         }
       } else {
-        // Seller doesn't have access to folders
         setFolders([]);
       }
     } catch (error) {

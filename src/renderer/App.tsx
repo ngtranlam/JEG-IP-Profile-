@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { GoLoginProfileList } from './components/GoLoginProfileList';
-import { FolderList } from './components/FolderList';
+import { FolderListTable } from './components/FolderListTable';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 
@@ -62,25 +62,16 @@ function App() {
       // Test connection
       const connectionStatus = await window.electronAPI.gologinTestConnection();
       
-      // Get profile stats with proper calculation
-      const profilesData = await window.electronAPI.gologinListProfiles(1);
-      
-      let totalProfiles = 0;
-      let runningProfiles = 0;
-      
-      if (profilesData && profilesData.profiles) {
-        totalProfiles = profilesData.profiles.length;
-        // Count running profiles (those that cannot be run are currently running)
-        runningProfiles = profilesData.profiles.filter((profile: any) => !profile.canBeRunning).length;
-      }
+      // Get stats from database with role-based filtering
+      const stats = await window.electronAPI.localDataGetStats();
       
       setGoLoginStats({
-        totalProfiles,
-        runningProfiles,
+        totalProfiles: stats?.total_profiles || 0,
+        runningProfiles: stats?.running_profiles || 0,
         connectionStatus
       });
     } catch (error) {
-      console.error('Failed to load GoLogin data:', error);
+      console.error('Failed to load stats:', error);
       setGoLoginStats(prev => ({ ...prev, connectionStatus: false }));
     } finally {
       setLoading(false);
@@ -127,12 +118,13 @@ function App() {
           <GoLoginProfileList
             onProfileLaunch={(profileId) => console.log('GoLogin profile launched:', profileId)}
             onRefresh={loadGoLoginData}
+            currentUser={currentUser}
           />
         );
       case 'folders':
         return (
-          <FolderList
-            onFolderSelect={(folderId) => console.log('Folder selected:', folderId)}
+          <FolderListTable
+            currentUser={currentUser}
           />
         );
       default:

@@ -292,4 +292,169 @@ export class ApiService {
     });
     return response.data;
   }
+
+  // Local Data API methods (from database)
+  async getLocalFolders(token: string): Promise<any[]> {
+    const response = await this.makeRequest('/local_data/folders', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async getLocalProfiles(token: string, page: number = 1, limit: number = 50, search?: string, folderId?: string): Promise<any> {
+    let endpoint = `/local_data/profiles?page=${page}&limit=${limit}`;
+    if (search) endpoint += `&search=${encodeURIComponent(search)}`;
+    if (folderId) endpoint += `&folder=${folderId}`;
+    
+    const response = await this.makeRequest(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async getLocalProfile(token: string, profileId: string): Promise<any> {
+    const response = await this.makeRequest(`/local_data/profile/${profileId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async getLocalStats(token: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/stats', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async syncGoLoginData(token: string, syncType: 'full' | 'folders' | 'profiles' = 'full'): Promise<any> {
+    const response = await this.makeRequest('/local_data/sync', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ type: syncType }),
+    });
+    return response.data;
+  }
+
+  async getSyncStatus(token: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/sync_status', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async testLocalConnection(token: string): Promise<boolean> {
+    const response = await this.makeRequest('/local_data/test_connection', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.success;
+  }
+
+  // Bi-directional sync methods
+  async createProfileWithSync(token: string, profileData: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/create_profile', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileData }),
+    });
+    return response.data;
+  }
+
+  async updateProfileWithSync(token: string, profileId: string, profileData: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/update_profile', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId, profileData }),
+    });
+    return response.data;
+  }
+
+  async deleteProfileWithSync(token: string, profileId: string): Promise<void> {
+    await this.makeRequest('/local_data/delete_profile', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId }),
+    });
+  }
+
+  async createFolderWithSync(token: string, name: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/create_folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name }),
+    });
+    return response.data;
+  }
+
+  async setProxyWithSync(token: string, profileId: string, proxyData: any): Promise<void> {
+    await this.makeRequest('/local_data/set_proxy', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId, proxyData }),
+    });
+  }
+
+  // Seller management methods
+  async getSellers(token: string): Promise<any[]> {
+    const response = await this.makeRequest('/local_data/sellers', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async assignSellerToFolder(token: string, folderId: string, sellerId: number): Promise<void> {
+    await this.makeRequest('/local_data/assign_seller', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ folderId, sellerId }),
+    });
+  }
+
+  async removeSellerFromFolder(token: string, folderId: string): Promise<void> {
+    await this.makeRequest('/local_data/remove_seller', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ folderId }),
+    });
+  }
+
+  async createFolderWithSeller(token: string, name: string, sellerId?: number): Promise<any> {
+    const response = await this.makeRequest('/local_data/create_folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, sellerId }),
+    });
+    return response.data;
+  }
 }

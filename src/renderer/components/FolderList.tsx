@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit3, Trash2, Folder, RefreshCw, Search, X } from 'lucide-react';
+import { FolderOpen, Plus, Edit3, Trash2, Folder, RefreshCw, Search, X, User } from 'lucide-react';
 
 interface FolderItem {
-  id: string;
+  folder_id: string;
   name: string;
-  description?: string;
+  seller_id?: number;
+  seller_name?: string;
   profilesCount: number;
-  color?: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
+  synced_at: string;
+}
+
+interface Seller {
+  id: number;
+  userName: string;
+  fullName?: string;
+  email?: string;
 }
 
 interface FolderListProps {
   onFolderSelect?: (folderId: string) => void;
+  currentUser?: any;
 }
 
 export function FolderList({ onFolderSelect }: FolderListProps) {
