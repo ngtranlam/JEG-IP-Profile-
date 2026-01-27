@@ -168,12 +168,29 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     return countryMap[countryCode.toUpperCase()] || { flag: '🌐', name: countryCode };
   };
 
+  // Sync data once on component mount
   useEffect(() => {
-    loadProfiles();
+    syncData();
     loadFolders();
     loadProxyLocations();
     testConnection();
+  }, []);
+
+  // Reload profiles when page, search, or folder changes
+  useEffect(() => {
+    loadProfiles();
   }, [currentPage, searchTerm, selectedFolder]);
+
+  const syncData = async () => {
+    try {
+      console.log('Syncing data from GoLogin...');
+      await window.electronAPI.localDataSync();
+      console.log('Sync completed successfully');
+    } catch (error) {
+      console.error('Failed to sync data:', error);
+      // Continue loading even if sync fails
+    }
+  };
 
   const testConnection = async () => {
     try {
@@ -189,6 +206,12 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     try {
       setLoading(true);
       // Use local_data API with role-based filtering
+      console.log('Loading profiles with filters:', { 
+        page: currentPage, 
+        search: searchTerm, 
+        folder: selectedFolder 
+      });
+      
       const result = await window.electronAPI.localDataGetProfiles(
         currentPage,
         50, // limit
@@ -198,6 +221,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
       
       // Transform and normalize profile data from database
       console.log('Raw profiles from database:', result.profiles);
+      console.log('Total profiles:', result.total);
       const transformedProfiles = (result.profiles || []).map((profile: any) => ({
         id: profile.profile_id || profile.id,
         name: profile.name || `Profile ${profile.profile_id?.slice(0, 8) || 'Unknown'}`,
@@ -487,11 +511,20 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     if (!confirm('Are you sure you want to delete this profile?')) return;
 
     try {
-      await window.electronAPI.gologinDeleteProfile(profileId);
+      // Use local_data API to delete profile (will also delete on GoLogin)
+      await window.electronAPI.localDataDeleteProfile(profileId);
+      
+      // Update UI immediately by removing from state
+      setProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
+      setTotalProfiles(prev => prev - 1);
+      
+      // Reload to get fresh data
       await loadProfiles();
     } catch (error) {
       console.error('Failed to delete profile:', error);
       alert('Failed to delete profile. Please try again.');
+      // Reload on error to sync state
+      await loadProfiles();
     }
   };
 
@@ -629,7 +662,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
             >
               <option value="">All Folders</option>
               {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
+                <option key={folder.folder_id} value={folder.folder_id}>
                   {folder.name}
                 </option>
               ))}
@@ -925,7 +958,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                 >
                   <option value="">No folder</option>
                   {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
+                    <option key={folder.folder_id} value={folder.folder_id}>
                       {folder.name}
                     </option>
                   ))}

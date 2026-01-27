@@ -37,8 +37,23 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
   const isAdmin = currentUser?.roles === '1';
 
   useEffect(() => {
-    loadData();
+    syncAndLoadData();
   }, []);
+
+  const syncAndLoadData = async () => {
+    try {
+      // Sync data from GoLogin first
+      console.log('Syncing folders from GoLogin...');
+      await window.electronAPI.localDataSync();
+      console.log('Sync completed successfully');
+    } catch (error) {
+      console.error('Failed to sync data:', error);
+      // Continue loading even if sync fails
+    }
+    
+    // Load data after sync
+    await loadData();
+  };
 
   const loadData = async () => {
     try {
@@ -328,7 +343,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
                   <option value="">-- No seller --</option>
                   {sellers.map((seller) => (
                     <option key={seller.id} value={seller.id}>
-                      {seller.userName} {seller.fullName ? `(${seller.fullName})` : ''}
+                      {seller.fullName || seller.userName}
                     </option>
                   ))}
                 </select>
@@ -382,7 +397,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
                   <option value="">-- Select a seller --</option>
                   {sellers.map((seller) => (
                     <option key={seller.id} value={seller.id}>
-                      {seller.userName} {seller.fullName ? `(${seller.fullName})` : ''}
+                      {seller.fullName || seller.userName}
                     </option>
                   ))}
                 </select>

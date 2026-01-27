@@ -30,8 +30,23 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
   const isAdmin = currentUser?.roles === '1';
 
   useEffect(() => {
-    loadDashboardData();
+    syncAndLoadData();
   }, []);
+
+  const syncAndLoadData = async () => {
+    try {
+      // Sync data from GoLogin first
+      console.log('Syncing data from GoLogin...');
+      await window.electronAPI.localDataSync();
+      console.log('Sync completed successfully');
+    } catch (error) {
+      console.error('Failed to sync data:', error);
+      // Continue loading even if sync fails
+    }
+    
+    // Load dashboard data after sync
+    await loadDashboardData();
+  };
 
   const loadDashboardData = async () => {
     try {
