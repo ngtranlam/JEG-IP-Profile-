@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { ApiService } from './services/ApiService';
+import { AuthService } from './services/AuthService';
 
 // Load .env from project root (2 levels up from dist/main/main/)
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
@@ -9,9 +10,12 @@ dotenv.config({ path: path.join(__dirname, '../../../.env') });
 class ChromeProfileTool {
   private mainWindow: BrowserWindow | null = null;
   private apiService: ApiService;
+  private authService: AuthService;
 
   constructor() {
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
     this.apiService = new ApiService();
+    this.authService = new AuthService(apiBaseUrl);
   }
 
   async initialize() {
@@ -166,6 +170,53 @@ class ChromeProfileTool {
 
     ipcMain.handle('gologin:test-connection', async () => {
       return await this.apiService.gologinTestConnection();
+    });
+
+    // Authentication IPC handlers
+    ipcMain.handle('auth:login', async (_, userName, password) => {
+      try {
+        const result = await this.authService.login(userName, password);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('auth:logout', async () => {
+      await this.authService.logout();
+    });
+
+    ipcMain.handle('auth:validate-token', async () => {
+      return await this.authService.validateToken();
+    });
+
+    ipcMain.handle('auth:get-current-user', async () => {
+      return this.authService.getCurrentUser();
+    });
+
+    ipcMain.handle('auth:is-authenticated', async () => {
+      return this.authService.isAuthenticated();
+    });
+
+    // Permission-related IPC handlers
+    ipcMain.handle('auth:get-permissions', async () => {
+      return await this.authService.getUserPermissions();
+    });
+
+    ipcMain.handle('auth:is-admin', async () => {
+      return this.authService.isAdmin();
+    });
+
+    ipcMain.handle('auth:is-seller', async () => {
+      return this.authService.isSeller();
+    });
+
+    ipcMain.handle('auth:get-role-name', async () => {
+      return this.authService.getRoleName();
+    });
+
+    ipcMain.handle('auth:has-permission', async (_, permission) => {
+      return this.authService.hasPermission(permission);
     });
   }
 }

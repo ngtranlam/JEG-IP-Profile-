@@ -87,6 +87,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   gologinTestConnection: () => 
     ipcRenderer.invoke('gologin:test-connection'),
+
+  // Authentication
+  auth: {
+    login: (userName: string, password: string) => 
+      ipcRenderer.invoke('auth:login', userName, password),
+    
+    logout: () => 
+      ipcRenderer.invoke('auth:logout'),
+    
+    validateToken: () => 
+      ipcRenderer.invoke('auth:validate-token'),
+    
+    getCurrentUser: () => 
+      ipcRenderer.invoke('auth:get-current-user'),
+    
+    isAuthenticated: () => 
+      ipcRenderer.invoke('auth:is-authenticated'),
+    
+    getUserPermissions: () => 
+      ipcRenderer.invoke('auth:get-permissions'),
+    
+    isAdmin: () => 
+      ipcRenderer.invoke('auth:is-admin'),
+    
+    isSeller: () => 
+      ipcRenderer.invoke('auth:is-seller'),
+    
+    getRoleName: () => 
+      ipcRenderer.invoke('auth:get-role-name'),
+    
+    hasPermission: (permission: string) => 
+      ipcRenderer.invoke('auth:has-permission', permission),
+  },
 });
 
 // Type definitions for the exposed API
@@ -126,6 +159,21 @@ declare global {
       gologinCreateFolder: (name: string) => Promise<any>;
       gologinListTags: () => Promise<any[]>;
       gologinTestConnection: () => Promise<boolean>;
+      gologinGetProxyLocations: () => Promise<any[]>;
+      
+      // Authentication
+      auth: {
+        login: (userName: string, password: string) => Promise<any>;
+        logout: () => Promise<void>;
+        validateToken: () => Promise<any>;
+        getCurrentUser: () => Promise<any>;
+        isAuthenticated: () => Promise<boolean>;
+        getUserPermissions: () => Promise<any>;
+        isAdmin: () => Promise<boolean>;
+        isSeller: () => Promise<boolean>;
+        getRoleName: () => Promise<string>;
+        hasPermission: (permission: string) => Promise<boolean>;
+      };
     };
   }
 }

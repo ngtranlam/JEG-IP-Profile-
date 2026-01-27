@@ -3,12 +3,16 @@ import { Dashboard } from './components/Dashboard';
 import { GoLoginProfileList } from './components/GoLoginProfileList';
 import { FolderList } from './components/FolderList';
 import { Sidebar } from './components/Sidebar';
+import { Login } from './components/Login';
 
 type ActiveView = 'dashboard' | 'profiles' | 'folders';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [goLoginStats, setGoLoginStats] = useState({
     totalProfiles: 0,
     runningProfiles: 0,
@@ -16,8 +20,41 @@ function App() {
   });
 
   useEffect(() => {
-    loadGoLoginData();
+    checkAuthentication();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadGoLoginData();
+    }
+  }, [isAuthenticated]);
+
+  const checkAuthentication = async () => {
+    try {
+      setCheckingAuth(true);
+      const authenticated = await window.electronAPI.auth.isAuthenticated();
+      
+      if (authenticated) {
+        const user = await window.electronAPI.auth.validateToken();
+        if (user) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+          console.log('User authenticated:', user);
+        } else {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+        }
+      } else {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      setIsAuthenticated(false);
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
 
   const loadGoLoginData = async () => {
     try {
@@ -25,12 +62,21 @@ function App() {
       // Test connection
       const connectionStatus = await window.electronAPI.gologinTestConnection();
       
-      // Get profile stats
+      // Get profile stats with proper calculation
       const profilesData = await window.electronAPI.gologinListProfiles(1);
       
+      let totalProfiles = 0;
+      let runningProfiles = 0;
+      
+      if (profilesData && profilesData.profiles) {
+        totalProfiles = profilesData.profiles.length;
+        // Count running profiles (those that cannot be run are currently running)
+        runningProfiles = profilesData.profiles.filter((profile: any) => !profile.canBeRunning).length;
+      }
+      
       setGoLoginStats({
-        totalProfiles: profilesData.total || 0,
-        runningProfiles: 0, // TODO: Track running profiles
+        totalProfiles,
+        runningProfiles,
         connectionStatus
       });
     } catch (error) {
@@ -41,6 +87,28 @@ function App() {
     }
   };
 
+
+  const handleLoginSuccess = async () => {
+    setIsAuthenticated(true);
+    // Get user info after successful login
+    try {
+      const user = await window.electronAPI.auth.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await window.electronAPI.auth.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setActiveView('dashboard');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -53,7 +121,7 @@ function App() {
 
     switch (activeView) {
       case 'dashboard':
-        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} />;
+        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} currentUser={currentUser} />;
       case 'profiles':
         return (
           <GoLoginProfileList
@@ -68,13 +136,36 @@ function App() {
           />
         );
       default:
-        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} />;
+        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} currentUser={currentUser} />;
     }
   };
 
+  // Show loading while checking authentication
+  if (checkingAuth) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Show main app if authenticated
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar 
+        activeView={activeView} 
+        onViewChange={setActiveView}
+        onLogout={handleLogout}
+        currentUser={currentUser}
+      />
       <main className="flex-1 overflow-hidden">
         {renderContent()}
       </main>

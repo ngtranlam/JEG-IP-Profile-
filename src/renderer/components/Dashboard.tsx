@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Globe, Activity, AlertCircle, RefreshCw, Cloud, Play, Settings, FolderOpen } from 'lucide-react';
+import { Users, Globe, Activity, AlertCircle, RefreshCw, Cloud, Play, Settings, FolderOpen, TrendingUp, Server, Zap } from 'lucide-react';
 
 interface GoLoginStats {
   totalProfiles: number;
@@ -7,15 +7,27 @@ interface GoLoginStats {
   connectionStatus: boolean;
 }
 
+interface User {
+  id: string;
+  userName: string;
+  fullName: string;
+  email: string;
+  roles: string;
+}
+
 interface DashboardProps {
   goLoginStats: GoLoginStats;
   onRefresh: () => Promise<void>;
+  currentUser?: User | null;
 }
 
-export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
+export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardProps) {
   const [recentProfiles, setRecentProfiles] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Check if user is Admin (roles="1")
+  const isAdmin = currentUser?.roles === '1';
 
   useEffect(() => {
     loadDashboardData();
@@ -23,15 +35,43 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
 
   const loadDashboardData = async () => {
     try {
-      // Load recent profiles
+      // Load recent profiles with better error handling
       const profilesData = await window.electronAPI.gologinListProfiles(1);
-      setRecentProfiles(profilesData.profiles?.slice(0, 5) || []);
+      if (profilesData && profilesData.profiles) {
+        // Sort profiles by last activity and take top 5
+        const sortedProfiles = profilesData.profiles
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.lastActivity || 0).getTime();
+            const dateB = new Date(b.lastActivity || 0).getTime();
+            return dateB - dateA;
+          })
+          .slice(0, 5);
+        setRecentProfiles(sortedProfiles);
+      } else {
+        setRecentProfiles([]);
+      }
       
-      // Load folders
-      const foldersData = await window.electronAPI.gologinListFolders();
-      setFolders(foldersData?.slice(0, 3) || []);
+      // Load folders with profile count - only for Admin
+      if (isAdmin) {
+        const foldersData = await window.electronAPI.gologinListFolders();
+        if (foldersData && Array.isArray(foldersData)) {
+          // Add profile count for each folder if available
+          const foldersWithCount = foldersData.map(folder => ({
+            ...folder,
+            profilesCount: folder.profilesCount || 0 // Use actual count or 0
+          })).slice(0, 4); // Show up to 4 folders
+          setFolders(foldersWithCount);
+        } else {
+          setFolders([]);
+        }
+      } else {
+        // Seller doesn't have access to folders
+        setFolders([]);
+      }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
+      setRecentProfiles([]);
+      setFolders([]);
     }
   };
 
@@ -52,6 +92,9 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
       icon: Users,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      change: '+12%',
+      changeType: 'positive'
     },
     {
       title: 'Running Profiles',
@@ -59,6 +102,9 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
       icon: Activity,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      change: `${goLoginStats.runningProfiles}/${goLoginStats.totalProfiles}`,
+      changeType: 'neutral'
     },
     {
       title: 'Connection Status',
@@ -66,40 +112,51 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
       icon: Cloud,
       color: goLoginStats.connectionStatus ? 'text-green-600' : 'text-red-600',
       bgColor: goLoginStats.connectionStatus ? 'bg-green-50' : 'bg-red-50',
+      borderColor: goLoginStats.connectionStatus ? 'border-green-200' : 'border-red-200',
+      change: goLoginStats.connectionStatus ? 'Online' : 'Offline',
+      changeType: goLoginStats.connectionStatus ? 'positive' : 'negative'
+    },
+    {
+      title: 'Available Profiles',
+      value: Math.max(0, goLoginStats.totalProfiles - goLoginStats.runningProfiles),
+      icon: Zap,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      change: 'Ready to use',
+      changeType: 'neutral'
     },
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">GoLogin Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your GoLogin cloud profiles and services</p>
+    <div className="h-full overflow-y-auto">
+      <div className="p-6 space-y-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">JEG Anditect Browser</h1>
+          <p className="text-gray-600 text-lg">Overview of your Anditect browser profiles</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.title} className="bg-card rounded-lg border border-border p-6">
-              <div className="flex items-center">
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`h-6 w-6 ${stat.color}`} />
+            <div key={stat.title} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-3">
+                <div className={`${stat.bgColor} p-2 rounded-lg`}>
+                  <Icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <div className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  stat.changeType === 'positive' ? 'bg-green-100 text-green-700' :
+                  stat.changeType === 'negative' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {stat.change}
                 </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
               </div>
             </div>
           );
@@ -108,78 +165,116 @@ export function Dashboard({ goLoginStats, onRefresh }: DashboardProps) {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Recent Profiles</h2>
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900">Recent Profiles</h2>
+            <div className="bg-blue-50 px-3 py-1 rounded-full">
+              <span className="text-sm font-medium text-blue-700">{recentProfiles.length} profiles</span>
+            </div>
+          </div>
           {recentProfiles.length > 0 ? (
             <div className="space-y-3">
               {recentProfiles.map((profile) => (
-                <div key={profile.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
-                  <div>
-                    <p className="font-medium text-foreground">{profile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {profile.os?.toUpperCase()} • {profile.browserType || 'Chrome'}
-                    </p>
+                <div key={profile.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <Globe className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{profile.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {profile.os?.toUpperCase()} • {profile.browserType || 'chrome'}
+                      </p>
+                    </div>
                   </div>
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                     profile.canBeRunning 
                       ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
+                      : 'bg-red-100 text-red-800'
                   }`}>
-                    {profile.canBeRunning ? 'Available' : 'Locked'}
+                    {profile.canBeRunning ? 'Available' : 'Busy'}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground">No profiles found</p>
+            <div className="text-center py-8">
+              <Globe className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No profiles found</p>
+              <p className="text-sm text-gray-400">Create your first profile to get started</p>
+            </div>
           )}
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Folders</h2>
-          <div className="space-y-3">
-            {folders.length > 0 ? (
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Folders</h3>
-                {folders.map((folder, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-accent rounded-md mb-2">
-                    <FolderOpen className="w-4 h-4 text-purple-600" />
-                    <span className="text-sm">{folder.name || `Folder ${index + 1}`}</span>
-                  </div>
-                ))}
+        {/* Folders section - only visible for Admin */}
+        {isAdmin && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Folders</h2>
+              <div className="bg-purple-50 px-3 py-1 rounded-full">
+                <span className="text-sm font-medium text-purple-700">{folders.length} folders</span>
               </div>
-            ) : (
-              <p className="text-muted-foreground">No folders configured</p>
-            )}
+            </div>
+            <div className="space-y-3">
+              {folders.length > 0 ? (
+                folders.map((folder, index) => (
+                  <div key={index} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="bg-purple-100 p-2 rounded-lg">
+                      <FolderOpen className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">{folder.name || `Folder ${index + 1}`}</p>
+                      <p className="text-sm text-gray-500">{folder.profilesCount || 0} profiles</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No folders configured</p>
+                  <p className="text-sm text-gray-400">Organize your profiles with folders</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900">Quick Actions</h2>
+          <TrendingUp className="h-6 w-6 text-gray-400" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 text-left bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <Play className="w-5 h-5" />
-              <h3 className="font-medium">Create Quick Profile</h3>
+          <button className="group p-6 text-left bg-white rounded-xl border border-blue-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
+                <Play className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Create Profile</h3>
             </div>
-            <p className="text-sm opacity-90">Set up a new GoLogin profile instantly</p>
+            <p className="text-sm text-gray-600">Set up a new GoLogin profile with custom settings</p>
           </button>
-          <button className="p-4 text-left bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <Settings className="w-5 h-5" />
-              <h3 className="font-medium">Manage Proxies</h3>
+          <button className="group p-6 text-left bg-white rounded-xl border border-green-200 hover:border-green-300 hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-green-100 p-2 rounded-lg group-hover:bg-green-200 transition-colors">
+                <Settings className="w-5 h-5 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Manage Proxies</h3>
             </div>
-            <p className="text-sm opacity-90">Configure proxy settings for profiles</p>
+            <p className="text-sm text-gray-600">Configure proxy settings and test connections</p>
           </button>
-          <button className="p-4 text-left bg-accent text-accent-foreground rounded-md hover:bg-accent/80 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <Cloud className="w-5 h-5" />
-              <h3 className="font-medium">Sync Profiles</h3>
+          <button className="group p-6 text-left bg-white rounded-xl border border-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Cloud className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Sync Cloud</h3>
             </div>
-            <p className="text-sm opacity-90">Synchronize with GoLogin cloud</p>
+            <p className="text-sm text-gray-600">Synchronize profiles with GoLogin cloud service</p>
           </button>
+        </div>
         </div>
       </div>
     </div>
