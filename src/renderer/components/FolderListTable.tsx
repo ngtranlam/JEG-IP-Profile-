@@ -30,8 +30,10 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [newFolderName, setNewFolderName] = useState('');
+  const [editFolderName, setEditFolderName] = useState('');
   const [selectedSellerId, setSelectedSellerId] = useState<string>('');
 
   const isAdmin = currentUser?.roles === '1';
@@ -140,6 +142,45 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
     setSelectedFolderId(folderId);
     setSelectedSellerId('');
     setShowAssignModal(true);
+  };
+
+  const openEditModal = (folder: FolderItem) => {
+    setSelectedFolderId(folder.folder_id);
+    setEditFolderName(folder.name);
+    setShowEditModal(true);
+  };
+
+  const handleEditFolder = async () => {
+    if (!editFolderName.trim() || !selectedFolderId) return;
+
+    try {
+      await window.electronAPI.localDataUpdateFolder(
+        selectedFolderId,
+        editFolderName.trim()
+      );
+      
+      setEditFolderName('');
+      setSelectedFolderId('');
+      setShowEditModal(false);
+      // Load data without syncing to preserve local changes
+      await loadData();
+    } catch (error) {
+      console.error('Failed to update folder:', error);
+      alert('Failed to update folder. Please try again.');
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    if (!confirm(`Are you sure you want to delete the folder "${folderName}"? This action cannot be undone.`)) return;
+
+    try {
+      await window.electronAPI.localDataDeleteFolder(folderId);
+      // Load data without syncing to preserve local changes
+      await loadData();
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      alert('Failed to delete folder. Please try again.');
+    }
   };
 
   const filteredFolders = folders.filter(folder =>
@@ -286,13 +327,29 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
                   </td>
                   {isAdmin && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => openAssignModal(folder.folder_id)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                        title="Assign seller"
-                      >
-                        <User className="w-4 h-4 inline" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openAssignModal(folder.folder_id)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Assign seller"
+                        >
+                          <User className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEditModal(folder)}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Edit folder"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFolder(folder.folder_id, folder.name)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete folder"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -363,6 +420,55 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Folder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Folder Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Edit Folder</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Folder Name *
+                </label>
+                <input
+                  type="text"
+                  value={editFolderName}
+                  onChange={(e) => setEditFolderName(e.target.value)}
+                  placeholder="Enter folder name"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-gray-600 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditFolder}
+                disabled={!editFolderName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Changes
               </button>
             </div>
           </div>

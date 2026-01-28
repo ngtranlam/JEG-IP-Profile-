@@ -484,10 +484,29 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
         profileData.notes = profileNotes;
       }
       
-      await window.electronAPI.gologinCreateProfile(profileData);
+      // Get folder name from folder ID
+      let folderName = null;
+      if (isSeller) {
+        // Seller: automatically use their first assigned folder
+        if (folders.length > 0) {
+          folderName = folders[0].name;
+        }
+      } else {
+        // Admin: use selected folder
+        if (newProfileFolder) {
+          const selectedFolder = folders.find(f => f.folder_id === newProfileFolder);
+          if (selectedFolder) {
+            folderName = selectedFolder.name;
+          }
+        }
+      }
+      
+      // Use localDataCreateProfile to create profile with folder assignment
+      await window.electronAPI.localDataCreateProfile(profileData, folderName);
       setShowCreateModal(false);
       setNewProfileName('');
       setNewProfileOS('win');
+      setNewProfileFolder('');
       setProfileNotes('');
       setProxyConfig({
         type: 'auto',
@@ -942,7 +961,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
 
             {/* Profile Name and Folder */}
             <div className="p-6 border-b bg-gray-50">
-              <div className="grid grid-cols-2 gap-4">
+              <div className={isSeller ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
                 <input
                   type="text"
                   value={newProfileName}
@@ -951,18 +970,20 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                   className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   autoFocus
                 />
-                <select
-                  value={newProfileFolder}
-                  onChange={(e) => setNewProfileFolder(e.target.value)}
-                  className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">No folder</option>
-                  {folders.map((folder) => (
-                    <option key={folder.folder_id} value={folder.folder_id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </select>
+                {!isSeller && (
+                  <select
+                    value={newProfileFolder}
+                    onChange={(e) => setNewProfileFolder(e.target.value)}
+                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">No folder</option>
+                    {folders.map((folder) => (
+                      <option key={folder.folder_id} value={folder.folder_id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

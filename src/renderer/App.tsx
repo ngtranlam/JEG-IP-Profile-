@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { GoLoginProfileList } from './components/GoLoginProfileList';
 import { FolderListTable } from './components/FolderListTable';
+import { UserManagement } from './components/UserManagement';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 
-type ActiveView = 'dashboard' | 'profiles' | 'folders';
+type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
@@ -124,6 +125,12 @@ function App() {
       case 'folders':
         return (
           <FolderListTable
+            currentUser={currentUser}
+          />
+        );
+      case 'users':
+        return (
+          <UserManagement
             currentUser={currentUser}
           />
         );

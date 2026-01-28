@@ -219,10 +219,10 @@ class ChromeProfileTool {
     });
 
     // Bi-directional sync IPC handlers
-    ipcMain.handle('local-data:create-profile', async (_, profileData) => {
+    ipcMain.handle('local-data:create-profile', async (_, profileData, folderName) => {
       const token = this.authService.getCurrentToken();
       if (!token) throw new Error('Not authenticated');
-      return await this.apiService.createProfileWithSync(token, profileData);
+      return await this.apiService.createProfileWithSync(token, profileData, folderName);
     });
 
     ipcMain.handle('local-data:update-profile', async (_, profileId, profileData) => {
@@ -274,6 +274,49 @@ class ChromeProfileTool {
       return await this.apiService.createFolderWithSeller(token, name, sellerId);
     });
 
+    ipcMain.handle('local-data:update-folder', async (_, folderId, name) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateFolder(token, folderId, name);
+    });
+
+    ipcMain.handle('local-data:delete-folder', async (_, folderId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.deleteFolder(token, folderId);
+    });
+
+    // User management IPC handlers
+    ipcMain.handle('local-data:get-users', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getUsers(token);
+    });
+
+    ipcMain.handle('local-data:create-user', async (_, userData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.createUser(token, userData);
+    });
+
+    ipcMain.handle('local-data:update-user', async (_, userData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateUser(token, userData);
+    });
+
+    ipcMain.handle('local-data:delete-user', async (_, userId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.deleteUser(token, userId);
+    });
+
+    ipcMain.handle('local-data:toggle-user-status', async (_, userId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.toggleUserStatus(token, userId);
+    });
+
     // Authentication IPC handlers
     ipcMain.handle('auth:login', async (_, userName, password) => {
       try {
@@ -286,6 +329,16 @@ class ChromeProfileTool {
 
     ipcMain.handle('auth:logout', async () => {
       await this.authService.logout();
+    });
+
+    ipcMain.handle('auth:change-password', async (_, oldPassword, newPassword) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+        await this.apiService.changePassword(token, oldPassword, newPassword);
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to change password');
+      }
     });
 
     ipcMain.handle('auth:validate-token', async () => {

@@ -25,6 +25,7 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
   const [recentProfiles, setRecentProfiles] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [userCount, setUserCount] = useState(0);
   
   // Check if user is Admin (roles="1")
   const isAdmin = currentUser?.roles === '1';
@@ -79,6 +80,15 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
         } else {
           setFolders([]);
         }
+        
+        // Load user count for Admin
+        try {
+          const users = await window.electronAPI.localDataGetUsers();
+          setUserCount(users?.length || 0);
+        } catch (error) {
+          console.error('Failed to load user count:', error);
+          setUserCount(0);
+        }
       } else {
         setFolders([]);
       }
@@ -99,7 +109,8 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
     }
   };
 
-  const stats = [
+  // Admin stats: Total Profiles, Running Profiles, Available Profiles, Total Users
+  const adminStats = [
     {
       title: 'Total Profiles',
       value: goLoginStats.totalProfiles,
@@ -121,14 +132,48 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
       changeType: 'neutral'
     },
     {
-      title: 'Connection Status',
-      value: goLoginStats.connectionStatus ? 'Connected' : 'Disconnected',
-      icon: Cloud,
-      color: goLoginStats.connectionStatus ? 'text-green-600' : 'text-red-600',
-      bgColor: goLoginStats.connectionStatus ? 'bg-green-50' : 'bg-red-50',
-      borderColor: goLoginStats.connectionStatus ? 'border-green-200' : 'border-red-200',
-      change: goLoginStats.connectionStatus ? 'Online' : 'Offline',
-      changeType: goLoginStats.connectionStatus ? 'positive' : 'negative'
+      title: 'Available Profiles',
+      value: Math.max(0, goLoginStats.totalProfiles - goLoginStats.runningProfiles),
+      icon: Zap,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      change: 'Ready to use',
+      changeType: 'neutral'
+    },
+    {
+      title: 'Total Users',
+      value: userCount,
+      icon: Users,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      change: 'System users',
+      changeType: 'neutral'
+    },
+  ];
+
+  // Seller stats: Total Profiles, Running Profiles, Available Profiles, Connection Status
+  const sellerStats = [
+    {
+      title: 'Total Profiles',
+      value: goLoginStats.totalProfiles,
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      change: '+12%',
+      changeType: 'positive'
+    },
+    {
+      title: 'Running Profiles',
+      value: goLoginStats.runningProfiles,
+      icon: Activity,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      change: `${goLoginStats.runningProfiles}/${goLoginStats.totalProfiles}`,
+      changeType: 'neutral'
     },
     {
       title: 'Available Profiles',
@@ -140,16 +185,23 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
       change: 'Ready to use',
       changeType: 'neutral'
     },
+    {
+      title: 'Connection Status',
+      value: goLoginStats.connectionStatus ? 'Connected' : 'Disconnected',
+      icon: Cloud,
+      color: goLoginStats.connectionStatus ? 'text-green-600' : 'text-red-600',
+      bgColor: goLoginStats.connectionStatus ? 'bg-green-50' : 'bg-red-50',
+      borderColor: goLoginStats.connectionStatus ? 'border-green-200' : 'border-red-200',
+      change: goLoginStats.connectionStatus ? 'Online' : 'Offline',
+      changeType: goLoginStats.connectionStatus ? 'positive' : 'negative'
+    },
   ];
+
+  const stats = isAdmin ? adminStats : sellerStats;
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-6 space-y-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">JEG Anditect Browser</h1>
-          <p className="text-gray-600 text-lg">Overview of your Anditect browser profiles</p>
-        </div>
-
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
@@ -201,12 +253,8 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser }: DashboardPro
                       </p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    profile.canBeRunning 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {profile.canBeRunning ? 'Available' : 'Busy'}
+                  <div className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                    Available
                   </div>
                 </div>
               ))}

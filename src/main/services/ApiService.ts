@@ -364,13 +364,13 @@ export class ApiService {
   }
 
   // Bi-directional sync methods
-  async createProfileWithSync(token: string, profileData: any): Promise<any> {
+  async createProfileWithSync(token: string, profileData: any, folderName?: string): Promise<any> {
     const response = await this.makeRequest('/local_data/create_profile', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ profileData }),
+      body: JSON.stringify({ profileData, folderName }),
     });
     return response.data;
   }
@@ -456,5 +456,86 @@ export class ApiService {
       body: JSON.stringify({ name, sellerId }),
     });
     return response.data;
+  }
+
+  async updateFolder(token: string, folderId: string, name: string): Promise<void> {
+    await this.makeRequest('/local_data/update_folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ folderId, name }),
+    });
+  }
+
+  async deleteFolder(token: string, folderId: string): Promise<void> {
+    await this.makeRequest('/local_data/delete_folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ folderId }),
+    });
+  }
+
+  // User management methods
+  async getUsers(token: string): Promise<any[]> {
+    const response = await this.makeRequest('/local_data/users', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async createUser(token: string, userData: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/create_user', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(userData),
+    });
+    return response.data;
+  }
+
+  async updateUser(token: string, userData: any): Promise<void> {
+    await this.makeRequest('/local_data/update_user', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(token: string, userId: number): Promise<void> {
+    await this.makeRequest('/local_data/delete_user', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id: userId }),
+    });
+  }
+
+  async toggleUserStatus(token: string, userId: number): Promise<void> {
+    await this.makeRequest('/local_data/toggle_user_status', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id: userId }),
+    });
+  }
+
+  async changePassword(token: string, oldPassword: string, newPassword: string): Promise<void> {
+    await this.makeRequest('/auth/change_password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
   }
 }

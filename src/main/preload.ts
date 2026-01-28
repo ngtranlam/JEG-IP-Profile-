@@ -111,8 +111,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('local-data:test-connection'),
 
   // Bi-directional sync methods
-  localDataCreateProfile: (profileData: any) => 
-    ipcRenderer.invoke('local-data:create-profile', profileData),
+  localDataCreateProfile: (profileData: any, folderName?: string) => 
+    ipcRenderer.invoke('local-data:create-profile', profileData, folderName),
   
   localDataUpdateProfile: (profileId: string, profileData: any) => 
     ipcRenderer.invoke('local-data:update-profile', profileId, profileData),
@@ -135,6 +135,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   localDataCreateFolder: (name: string, sellerId?: number) => 
     ipcRenderer.invoke('local-data:create-folder-with-seller', name, sellerId),
+  
+  localDataUpdateFolder: (folderId: string, name: string) => 
+    ipcRenderer.invoke('local-data:update-folder', folderId, name),
+  
+  localDataDeleteFolder: (folderId: string) => 
+    ipcRenderer.invoke('local-data:delete-folder', folderId),
+
+  // User management methods
+  localDataGetUsers: () => 
+    ipcRenderer.invoke('local-data:get-users'),
+  
+  localDataCreateUser: (userData: any) => 
+    ipcRenderer.invoke('local-data:create-user', userData),
+  
+  localDataUpdateUser: (userData: any) => 
+    ipcRenderer.invoke('local-data:update-user', userData),
+  
+  localDataDeleteUser: (userId: number) => 
+    ipcRenderer.invoke('local-data:delete-user', userId),
+  
+  localDataToggleUserStatus: (userId: number) => 
+    ipcRenderer.invoke('local-data:toggle-user-status', userId),
 
   // Authentication
   auth: {
@@ -152,6 +174,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     isAuthenticated: () => 
       ipcRenderer.invoke('auth:is-authenticated'),
+    
+    changePassword: (oldPassword: string, newPassword: string) =>
+      ipcRenderer.invoke('auth:change-password', oldPassword, newPassword),
     
     getUserPermissions: () => 
       ipcRenderer.invoke('auth:get-permissions'),
@@ -219,7 +244,7 @@ declare global {
       localDataTestConnection: () => Promise<boolean>;
       
       // Bi-directional sync methods
-      localDataCreateProfile: (profileData: any) => Promise<any>;
+      localDataCreateProfile: (profileData: any, folderName?: string) => Promise<any>;
       localDataUpdateProfile: (profileId: string, profileData: any) => Promise<any>;
       localDataDeleteProfile: (profileId: string) => Promise<void>;
       localDataSetProxy: (profileId: string, proxyData: any) => Promise<void>;
@@ -229,6 +254,15 @@ declare global {
       localDataAssignSeller: (folderId: string, sellerId: number) => Promise<void>;
       localDataRemoveSeller: (folderId: string) => Promise<void>;
       localDataCreateFolder: (name: string, sellerId?: number) => Promise<any>;
+      localDataUpdateFolder: (folderId: string, name: string) => Promise<void>;
+      localDataDeleteFolder: (folderId: string) => Promise<void>;
+      
+      // User management methods
+      localDataGetUsers: () => Promise<any[]>;
+      localDataCreateUser: (userData: any) => Promise<any>;
+      localDataUpdateUser: (userData: any) => Promise<void>;
+      localDataDeleteUser: (userId: number) => Promise<void>;
+      localDataToggleUserStatus: (userId: number) => Promise<void>;
       
       // Authentication
       auth: {
@@ -237,6 +271,7 @@ declare global {
         validateToken: () => Promise<any>;
         getCurrentUser: () => Promise<any>;
         isAuthenticated: () => Promise<boolean>;
+        changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
         getUserPermissions: () => Promise<any>;
         isAdmin: () => Promise<boolean>;
         isSeller: () => Promise<boolean>;
