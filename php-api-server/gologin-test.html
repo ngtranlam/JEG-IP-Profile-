@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GoLogin API Test</title>
+</head>
+<body>
+    <h2>GoLogin API Test</h2>
+    <div id="result">Loading...</div>
+    
+    <script>
+        fetch('/api/gologin/folders')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = '<pre>Error: ' + error + '</pre>';
+            });
+    </script>
+</body>
+</html>

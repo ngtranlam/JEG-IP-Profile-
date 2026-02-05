@@ -1,0 +1,105 @@
+
+Thank you for your response. Here are the details you requested:
+
+1. INTEGRATION TYPE:
+   - We are using PHP with cURL to call the GoLogin REST API directly
+   - NOT using Puppeteer, Selenium, or Playwright
+   - We're calling the API endpoints: /folders, /browser/v2, etc.
+
+2. ENVIRONMENT:
+   - Running on BOTH:
+     a) Remote Server: Linux (CentOS/cPanel) - IP: 94.237.75.155
+     b) Local Machine: macOS (for testing)
+   - Both environments show the same HTTP 500 errors
+
+3. ORBITA BROWSER:
+   - We are NOT using Orbita browser
+   - We only use the GoLogin REST API to manage profiles and folders
+   - Our application is an Electron desktop app that calls your API
+
+4. ACCOUNT EMAIL:
+   jeganditech@gmail.com
+
+5. TECHNICAL DETAILS:
+
+API TOKEN:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTZlZWM3YTNhN2I0YjZjOTVhMWJiYTQiLCJ0eXBlIjoiZGV2Iiwiand0aWQiOiI2OTZlZjVkZDUyZDU2NDE2MGMwYWRhNmQifQ.JUy6OGhCQNvArC-P8Q3B4FKdeltqeBxYKtodN9JSn5w
+
+ISSUE:
+All API endpoints return HTTP 500 Internal Server Error
+
+ENDPOINTS TESTED:
+- GET https://api.gologin.com/folders → HTTP 500
+- GET https://api.gologin.com/browser/v2?page=1 → HTTP 500
+- GET https://api.gologin.com/tags → HTTP 404 (endpoint doesn't exist)
+
+ERROR RESPONSE:
+{"statusCode":500,"message":"Internal server error"}
+
+NETWORK CONNECTIVITY:
+- ✓ Can reach api.gologin.com (HTTP 200 on base URL)
+- ✓ SSL/TLS connection works
+- ✓ No firewall or network issues
+
+TEST SCRIPT (PHP):
+```php
+<?php
+$apiToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+$ch = curl_init('https://api.gologin.com/folders');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Authorization: Bearer ' . $apiToken,
+    'Content-Type: application/json',
+    'Accept: application/json'
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+echo "HTTP Code: $httpCode\n";
+echo "Response: $response\n";
+```
+
+FULL TERMINAL OUTPUT:
+=== Testing New GoLogin API Token ===
+
+Token: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+
+Testing: List Profiles (/browser/v2?page=1)
+  HTTP Code: 500
+  ❌ SERVER ERROR - GoLogin API internal error
+  Response: {"statusCode":500,"message":"Internal server error"}
+
+Testing: List Folders (/folders)
+  HTTP Code: 500
+  ❌ SERVER ERROR - GoLogin API internal error
+  Response: {"statusCode":500,"message":"Internal server error"}
+
+Testing: List Tags (/tags)
+  HTTP Code: 404
+  ❌ HTTP Error 404
+  Response: {"statusCode":404,"message":"Cannot GET /tags","error":"Not Found"}
+
+=== Network Diagnostic ===
+Testing basic connectivity to api.gologin.com...
+✓ Can reach api.gologin.com (HTTP 200)
+
+=== Test Complete ===
+
+ADDITIONAL NOTES:
+- The issue occurs on both remote server AND local machine
+- This suggests the problem is not related to IP blocking
+- The GoLogin web dashboard works fine - we can see profiles and folders there
+- The API was working previously with an older token
+- We generated a new token but still get HTTP 500 errors
+- This started happening recently (within the last few days)
+
+QUESTION:
+Is there a known issue with the GoLogin API currently? Or is there something wrong with our account that would cause all API endpoints to return HTTP 500?
+
+Thank you for your help!
+
+Best regards
