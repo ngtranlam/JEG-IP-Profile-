@@ -539,4 +539,11 @@ export class ApiService {
       body: JSON.stringify({ oldPassword, newPassword }),
     });
   }
+
+  async getUserByUserName(userName: string): Promise<any> {
+    const response = await this.makeRequest(`/auth/user/${userName}`, {
+      method: 'GET',
+    });
+    return response.data;
+  }
 }

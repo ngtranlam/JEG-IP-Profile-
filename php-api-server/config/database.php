@@ -7,7 +7,7 @@ class Database {
     private $conn;
 
     public function __construct() {
-        $this->host = $_ENV['DB_HOST'] ?? 'localhost';
+        $this->host = $_ENV['DB_HOST'] ?? '127.0.0.1';
         $this->db_name = $_ENV['DB_NAME'] ?? '';
         $this->username = $_ENV['DB_USERNAME'] ?? '';
         $this->password = $_ENV['DB_PASSWORD'] ?? '';

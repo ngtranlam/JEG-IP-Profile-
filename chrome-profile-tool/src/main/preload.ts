@@ -166,6 +166,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     logout: () => 
       ipcRenderer.invoke('auth:logout'),
     
+    changePassword: (oldPassword: string, newPassword: string) =>
+      ipcRenderer.invoke('auth:change-password', oldPassword, newPassword),
+    
+    forceChangePassword: (userName: string, newPassword: string) =>
+      ipcRenderer.invoke('auth:force-change-password', userName, newPassword),
+    
     validateToken: () => 
       ipcRenderer.invoke('auth:validate-token'),
     
@@ -174,9 +180,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     isAuthenticated: () => 
       ipcRenderer.invoke('auth:is-authenticated'),
-    
-    changePassword: (oldPassword: string, newPassword: string) =>
-      ipcRenderer.invoke('auth:change-password', oldPassword, newPassword),
     
     getUserPermissions: () => 
       ipcRenderer.invoke('auth:get-permissions'),
@@ -192,6 +195,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     hasPermission: (permission: string) => 
       ipcRenderer.invoke('auth:has-permission', permission),
+    
+    // Firebase 2FA methods
+    generate2FASecret: () =>
+      ipcRenderer.invoke('auth:generate2FASecret'),
+    
+    enable2FA: (verificationCode: string) =>
+      ipcRenderer.invoke('auth:enable2FA', verificationCode),
+    
+    verify2FA: (userName: string, verificationCode: string) =>
+      ipcRenderer.invoke('auth:verify2FA', userName, verificationCode),
+    
+    disable2FA: () =>
+      ipcRenderer.invoke('auth:disable2FA'),
+    
+    is2FAEnabled: () =>
+      ipcRenderer.invoke('auth:is2FAEnabled'),
   },
 });
 

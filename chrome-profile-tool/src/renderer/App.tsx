@@ -5,6 +5,8 @@ import { FolderListTable } from './components/FolderListTable';
 import { UserManagement } from './components/UserManagement';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
+import { ForcePasswordChange } from './components/ForcePasswordChange';
+import { TwoFactorVerification } from './components/TwoFactorVerification';
 
 type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users';
 
@@ -14,6 +16,9 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
+  const [require2FA, setRequire2FA] = useState(false);
+  const [pendingUserName, setPendingUserName] = useState('');
   const [goLoginStats, setGoLoginStats] = useState({
     totalProfiles: 0,
     runningProfiles: 0,
@@ -38,9 +43,20 @@ function App() {
       if (authenticated) {
         const user = await window.electronAPI.auth.validateToken();
         if (user) {
-          setIsAuthenticated(true);
-          setCurrentUser(user);
-          console.log('User authenticated:', user);
+          // Check if password change is required
+          if ((user as any).requirePasswordChange) {
+            console.log('Password change required on reload');
+            setRequirePasswordChange(true);
+            setPendingUserName((user as any).userName || '');
+            setIsAuthenticated(false);
+            setCurrentUser(null);
+            // Logout to clear session
+            await window.electronAPI.auth.logout();
+          } else {
+            setIsAuthenticated(true);
+            setCurrentUser(user);
+            console.log('User authenticated:', user);
+          }
         } else {
           setIsAuthenticated(false);
           setCurrentUser(null);
@@ -80,7 +96,22 @@ function App() {
   };
 
 
-  const handleLoginSuccess = async () => {
+  const handleLoginSuccess = async (loginResult?: any) => {
+    // Check if password change is required (first login with default password)
+    if (loginResult?.requirePasswordChange) {
+      setRequirePasswordChange(true);
+      setPendingUserName(loginResult.userName);
+      return;
+    }
+
+    // Check if 2FA is required
+    if (loginResult?.require2FA) {
+      setRequire2FA(true);
+      setPendingUserName(loginResult.userName);
+      return;
+    }
+
+    // Normal login flow
     setIsAuthenticated(true);
     // Get user info after successful login
     try {
@@ -89,6 +120,36 @@ function App() {
     } catch (error) {
       console.error('Failed to get current user:', error);
     }
+  };
+
+  const handlePasswordChanged = async () => {
+    setRequirePasswordChange(false);
+    // After password change, check if 2FA is required
+    // For now, proceed to normal login
+    setIsAuthenticated(true);
+    try {
+      const user = await window.electronAPI.auth.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+    }
+  };
+
+  const handle2FAVerified = async () => {
+    setRequire2FA(false);
+    setIsAuthenticated(true);
+    try {
+      const user = await window.electronAPI.auth.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+    }
+  };
+
+  const handleCancelAuth = () => {
+    setRequirePasswordChange(false);
+    setRequire2FA(false);
+    setPendingUserName('');
   };
 
   const handleLogout = async () => {
@@ -148,6 +209,28 @@ function App() {
           <p className="text-gray-600">Checking authentication...</p>
         </div>
       </div>
+    );
+  }
+
+  // Show force password change if required
+  if (requirePasswordChange) {
+    return (
+      <ForcePasswordChange
+        userName={pendingUserName}
+        onPasswordChanged={handlePasswordChanged}
+        onCancel={handleCancelAuth}
+      />
+    );
+  }
+
+  // Show 2FA verification if required
+  if (require2FA) {
+    return (
+      <TwoFactorVerification
+        userName={pendingUserName}
+        onVerificationSuccess={handle2FAVerified}
+        onCancel={handleCancelAuth}
+      />
     );
   }
 

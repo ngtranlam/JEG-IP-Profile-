@@ -4,6 +4,8 @@ import * as dotenv from 'dotenv';
 import { ApiService } from './services/ApiService';
 import { AuthService } from './services/AuthService';
 import { AutoSyncService } from './services/AutoSyncService';
+import { FirebaseService } from './services/FirebaseService';
+import { TotpSecret, MultiFactorResolver } from 'firebase/auth';
 
 // Load .env from project root (2 levels up from dist/main/main/)
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
@@ -13,12 +15,16 @@ class ChromeProfileTool {
   private apiService: ApiService;
   private authService: AuthService;
   private autoSyncService: AutoSyncService;
+  private firebaseService: FirebaseService;
+  private pendingTotpSecret: TotpSecret | null = null;
+  private pendingMfaResolver: MultiFactorResolver | null = null;
 
   constructor() {
     const apiBaseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
     this.apiService = new ApiService();
     this.authService = new AuthService(apiBaseUrl);
     this.autoSyncService = new AutoSyncService(this.apiService, this.authService);
+    this.firebaseService = new FirebaseService();
   }
 
   async initialize() {
@@ -320,9 +326,72 @@ class ChromeProfileTool {
     // Authentication IPC handlers
     ipcMain.handle('auth:login', async (_, userName, password) => {
       try {
-        const result = await this.authService.login(userName, password);
+        console.log(`[Login] Attempting login for userName: ${userName}`);
+        
+        // Step 1: Get user info from database to get email
+        const dbUser = await this.apiService.getUserByUserName(userName);
+        if (!dbUser) {
+          console.log(`[Login] User not found in database: ${userName}`);
+          throw new Error('Invalid username or password');
+        }
+
+        console.log(`[Login] User found in database:`, {
+          userName: dbUser.userName,
+          email: dbUser.email,
+          hasEmail: !!dbUser.email
+        });
+
+        // Generate email if not exists
+        const email = dbUser.email || `${userName.toLowerCase()}@jeg.local`;
+        console.log(`[Login] Using email for Firebase auth: ${email}`);
+
+        // Step 2: Authenticate with Firebase
+        console.log(`[Login] Attempting Firebase authentication with email: ${email}`);
+        const firebaseResult = await this.firebaseService.signInWithEmail(email, password);
+        console.log(`[Login] Firebase auth result:`, {
+          success: firebaseResult.success,
+          hasUser: !!firebaseResult.user,
+          error: firebaseResult.error
+        });
+
+        // Check if MFA is required
+        if (firebaseResult.requireMFA && firebaseResult.mfaResolver) {
+          console.log('[Login] MFA required');
+          this.pendingMfaResolver = firebaseResult.mfaResolver;
+          return {
+            success: false,
+            require2FA: true,
+            userName: userName
+          };
+        }
+
+        if (!firebaseResult.success || !firebaseResult.user) {
+          console.log('[Login] Firebase auth failed, throwing error');
+          throw new Error(firebaseResult.error || 'Firebase authentication failed');
+        }
+
+        // Step 3: Get Firebase ID token for backend login
+        console.log('[Login] Getting Firebase ID token for backend login...');
+        const firebaseToken = await firebaseResult.user.getIdToken();
+        
+        // Step 4: Login to backend with Firebase ID token
+        console.log('[Login] Calling backend loginWithFirebaseToken...');
+        const result = await this.authService.loginWithFirebaseToken(firebaseToken);
+        console.log('[Login] Backend login successful');
+
+        // Step 5: Check if password change is required from database
+        if (result.user && (result.user as any).requirePasswordChange) {
+          console.log('[Login] Password change required (from database)');
+          return {
+            success: false,
+            requirePasswordChange: true,
+            userName: userName
+          };
+        }
+
         return { success: true, data: result };
       } catch (error: any) {
+        console.error('[Login] Error occurred:', error);
         return { success: false, error: error.message };
       }
     });
@@ -335,8 +404,79 @@ class ChromeProfileTool {
       try {
         const token = this.authService.getCurrentToken();
         if (!token) throw new Error('Not authenticated');
+        
+        // Change password in Firebase first
+        await this.firebaseService.changePassword(oldPassword, newPassword);
+        
+        // Then update in backend database
         await this.apiService.changePassword(token, oldPassword, newPassword);
+        
+        // Clear requirePasswordChange flag in Firebase custom claims
+        const firebaseUser = this.firebaseService.getCurrentUser();
+        if (firebaseUser) {
+          const idTokenResult = await firebaseUser.getIdTokenResult();
+          const customClaims = idTokenResult.claims;
+          
+          if (customClaims.requirePasswordChange) {
+            // Update custom claims to remove requirePasswordChange flag
+            const updatedClaims = { ...customClaims, requirePasswordChange: false };
+            // Note: Custom claims can only be updated from server-side
+            // This will be handled by the backend API
+          }
+        }
       } catch (error: any) {
+        throw new Error(error.message || 'Failed to change password');
+      }
+    });
+
+    ipcMain.handle('auth:force-change-password', async (_, userName, newPassword) => {
+      try {
+        console.log(`[ForcePasswordChange] Changing password for user: ${userName}`);
+        
+        // Step 1: Generate default password (userName + jeg@123)
+        const defaultPassword = `${userName}jeg@123`;
+        console.log(`[ForcePasswordChange] Using default password for authentication`);
+        
+        // Step 2: Change password in Firebase
+        const changeResult = await this.firebaseService.changePassword(defaultPassword, newPassword);
+        if (!changeResult.success) {
+          throw new Error(changeResult.error || 'Password change failed');
+        }
+        console.log('[ForcePasswordChange] Firebase password changed successfully');
+        
+        // Step 2: Get Firebase ID token
+        const firebaseUser = this.firebaseService.getCurrentUser();
+        if (!firebaseUser) {
+          throw new Error('No Firebase user found');
+        }
+        
+        const firebaseToken = await firebaseUser.getIdToken(true);
+        console.log('[ForcePasswordChange] Got Firebase token');
+        
+        // Step 3: Call backend to update password in database and clear requirePasswordChange flag
+        const response = await fetch(`${this.apiService['baseUrl']}/auth/force-change-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${firebaseToken}`,
+          },
+          body: JSON.stringify({ newPassword }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update password in backend');
+        }
+        
+        console.log('[ForcePasswordChange] Backend password updated and flag cleared');
+        
+        // Step 4: Login to backend to get session token
+        const loginResult = await this.authService.loginWithFirebaseToken(firebaseToken);
+        console.log('[ForcePasswordChange] Backend login successful');
+        
+        return { success: true, data: loginResult };
+      } catch (error: any) {
+        console.error('[ForcePasswordChange] Error:', error);
         throw new Error(error.message || 'Failed to change password');
       }
     });
@@ -372,6 +512,101 @@ class ChromeProfileTool {
 
     ipcMain.handle('auth:has-permission', async (_, permission) => {
       return this.authService.hasPermission(permission);
+    });
+
+    // Firebase 2FA IPC handlers
+    ipcMain.handle('auth:generate2FASecret', async () => {
+      try {
+        const result = await this.firebaseService.generateTOTPSecret();
+        if (result.success && result.totpSecret) {
+          // Store the TOTP secret temporarily for enrollment
+          this.pendingTotpSecret = result.totpSecret;
+          return {
+            success: true,
+            qrCodeUrl: result.qrCodeUrl,
+            secretKey: result.secretKey
+          };
+        }
+        throw new Error(result.error || 'Failed to generate 2FA secret');
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to generate 2FA secret');
+      }
+    });
+
+    ipcMain.handle('auth:enable2FA', async (_, verificationCode) => {
+      try {
+        if (!this.pendingTotpSecret) {
+          throw new Error('No pending TOTP secret. Please generate a secret first.');
+        }
+
+        const result = await this.firebaseService.enable2FA(
+          this.pendingTotpSecret,
+          verificationCode,
+          'Authenticator App'
+        );
+
+        if (result.success) {
+          // Clear the pending secret after successful enrollment
+          this.pendingTotpSecret = null;
+          
+          // Generate recovery codes (mock for now, will be implemented later)
+          const recoveryCodes = Array.from({ length: 8 }, () => 
+            Math.random().toString(36).substring(2, 10).toUpperCase()
+          );
+
+          return {
+            success: true,
+            recoveryCodes
+          };
+        }
+        
+        throw new Error(result.error || 'Failed to enable 2FA');
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to enable 2FA');
+      }
+    });
+
+    ipcMain.handle('auth:verify2FA', async (_, userName, verificationCode) => {
+      try {
+        if (!this.pendingMfaResolver) {
+          throw new Error('No pending MFA verification');
+        }
+
+        const result = await this.firebaseService.verify2FACode(
+          this.pendingMfaResolver,
+          verificationCode
+        );
+
+        if (result.success) {
+          // Clear the pending resolver
+          this.pendingMfaResolver = null;
+          return { success: true };
+        }
+
+        throw new Error(result.error || 'Invalid verification code');
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to verify 2FA');
+      }
+    });
+
+    ipcMain.handle('auth:disable2FA', async () => {
+      try {
+        const result = await this.firebaseService.disable2FA();
+        if (result.success) {
+          return { success: true };
+        }
+        throw new Error(result.error || 'Failed to disable 2FA');
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to disable 2FA');
+      }
+    });
+
+    ipcMain.handle('auth:is2FAEnabled', async () => {
+      try {
+        return await this.firebaseService.is2FAEnabled();
+      } catch (error) {
+        return false;
+      }
     });
 
     // Auto-sync IPC handlers

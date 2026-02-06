@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import iegLogo from '../assets/ieg_logo.png';
+import iegLogo from '../assets/Layer2.png';
 import backgroundImage from '../assets/jeg-scaled.jpg';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (result?: any) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -22,7 +22,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const result = await window.electronAPI.auth.login(userName, password);
       
       if (result.success) {
-        onLoginSuccess();
+        onLoginSuccess(result);
+      } else if (result.requirePasswordChange || result.require2FA) {
+        // Handle password change or 2FA requirement
+        onLoginSuccess(result);
       } else {
         setError(result.error || 'Login failed');
       }

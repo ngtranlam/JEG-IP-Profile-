@@ -77,6 +77,37 @@ export class AuthService {
     }
   }
 
+  async loginWithFirebaseToken(firebaseToken: string): Promise<LoginResponse> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/auth/firebase-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${firebaseToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login with Firebase token failed');
+      }
+
+      const result = await response.json();
+      const data: LoginResponse = result.data;
+
+      // Store auth data
+      this.currentUser = data.user;
+      this.currentToken = data.token;
+      this.saveAuth(data);
+
+      console.log(`User logged in with Firebase: ${data.user.userName}`);
+      return data;
+    } catch (error) {
+      console.error('Firebase login error:', error);
+      throw error;
+    }
+  }
+
   async logout(): Promise<void> {
     if (!this.currentToken) {
       return;

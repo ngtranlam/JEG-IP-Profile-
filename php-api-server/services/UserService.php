@@ -1,13 +1,24 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Kreait\Firebase\Factory;
 
 class UserService {
     private $db;
     private $conn;
+    private $firebaseAuth;
 
     public function __construct() {
         $this->db = new Database();
         $this->conn = $this->db->getConnection();
+        
+        // Initialize Firebase Admin SDK
+        $serviceAccountPath = __DIR__ . '/../serviceAccountKey.json';
+        if (file_exists($serviceAccountPath)) {
+            $factory = (new Factory)->withServiceAccount($serviceAccountPath);
+            $this->firebaseAuth = $factory->createAuth();
+        }
     }
 
     public function login($userName, $password) {
@@ -77,7 +88,8 @@ class UserService {
             'email' => $result['email'],
             'phone' => $result['phone'],
             'address' => $result['address'],
-            'roles' => $result['roles']
+            'roles' => $result['roles'],
+            'requirePasswordChange' => $result['requirePasswordChange'] == 1
         ];
     }
 
@@ -319,7 +331,7 @@ class UserService {
      */
     public function changePassword($userId, $oldPassword, $newPassword) {
         // Get current user
-        $sql = "SELECT password FROM users WHERE id = :id";
+        $sql = "SELECT * FROM users WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':id', $userId);
         $stmt->execute();
@@ -338,7 +350,7 @@ class UserService {
         // Hash new password
         $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
         
-        // Update password
+        // Update password in database
         $updateSql = "UPDATE users SET password = :password WHERE id = :id";
         $updateStmt = $this->conn->prepare($updateSql);
         $updateStmt->bindParam(':password', $hashedPassword);
@@ -348,7 +360,169 @@ class UserService {
             throw new Exception("Failed to update password");
         }
         
+        // Clear requirePasswordChange flag in database
+        $updateFlagSql = "UPDATE users SET requirePasswordChange = 0 WHERE id = :id";
+        $updateFlagStmt = $this->conn->prepare($updateFlagSql);
+        $updateFlagStmt->bindParam(':id', $userId);
+        $updateFlagStmt->execute();
+        
         return true;
+    }
+
+    public function getUserByUserName($userName) {
+        $sql = "SELECT id, userName, fullName, email, phone, address, roles, status FROM users WHERE userName = :userName";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':userName', $userName);
+        $stmt->execute();
+        
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $user ?: null;
+    }
+
+    public function loginWithFirebaseToken($firebaseToken) {
+        if (!$this->firebaseAuth) {
+            throw new Exception("Firebase Auth not initialized");
+        }
+
+        try {
+            // Verify Firebase ID token with clock tolerance (leeway) to handle clock skew
+            $verifiedIdToken = $this->firebaseAuth->verifyIdToken($firebaseToken, $checkIfRevoked = false, $leewayInSeconds = 300);
+            $uid = $verifiedIdToken->claims()->get('sub');
+            $email = $verifiedIdToken->claims()->get('email');
+            
+            if (!$email) {
+                throw new Exception("Firebase token missing email");
+            }
+            
+            // Get user from database by email
+            $sql = "SELECT * FROM users WHERE email = :email";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+            
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // If not found by email, try with fake email pattern
+            if (!$user) {
+                // Extract userName from fake email (e.g., lamdev@jeg.local -> lamdev)
+                if (strpos($email, '@jeg.local') !== false) {
+                    $userName = str_replace('@jeg.local', '', $email);
+                    $sql = "SELECT * FROM users WHERE LOWER(userName) = LOWER(:userName)";
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bindParam(':userName', $userName);
+                    $stmt->execute();
+                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
+            }
+            
+            if (!$user) {
+                throw new Exception("User not found in database");
+            }
+            
+            // Check if account is locked
+            if ($user['status'] !== '1') {
+                throw new Exception("Your account has been locked. Please contact Admin for support.");
+            }
+            
+            // Generate session token
+            $token = $this->generateToken();
+            $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
+            
+            // Store session in database
+            $this->createSession($user['id'], $token, $expiresAt);
+            
+            // Return user info and token
+            return [
+                'user' => [
+                    'id' => $user['id'],
+                    'userName' => $user['userName'],
+                    'fullName' => $user['fullName'],
+                    'email' => $user['email'],
+                    'phone' => $user['phone'],
+                    'address' => $user['address'],
+                    'roles' => $user['roles'],
+                    'roleName' => $this->getRoleName($user),
+                    'isAdmin' => $this->isAdmin($user),
+                    'isSeller' => $this->isSeller($user),
+                    'requirePasswordChange' => $user['requirePasswordChange'] == 1
+                ],
+                'token' => $token,
+                'expiresAt' => $expiresAt
+            ];
+            
+        } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
+            throw new Exception("Invalid Firebase token: " . $e->getMessage());
+        }
+    }
+
+    public function forceChangePassword($firebaseToken, $newPassword) {
+        if (!$this->firebaseAuth) {
+            throw new Exception("Firebase Auth not initialized");
+        }
+
+        try {
+            // Verify Firebase ID token with clock tolerance
+            $verifiedIdToken = $this->firebaseAuth->verifyIdToken($firebaseToken, $checkIfRevoked = false, $leewayInSeconds = 300);
+            $uid = $verifiedIdToken->claims()->get('sub');
+            $email = $verifiedIdToken->claims()->get('email');
+            
+            if (!$email) {
+                throw new Exception("Firebase token missing email");
+            }
+            
+            // Get user from database by email
+            $sql = "SELECT * FROM users WHERE email = :email";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+            
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // If not found by email, try with fake email pattern
+            if (!$user) {
+                if (strpos($email, '@jeg.local') !== false) {
+                    $userName = str_replace('@jeg.local', '', $email);
+                    $sql = "SELECT * FROM users WHERE LOWER(userName) = LOWER(:userName)";
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bindParam(':userName', $userName);
+                    $stmt->execute();
+                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
+            }
+            
+            if (!$user) {
+                throw new Exception("User not found in database");
+            }
+            
+            // Note: No need to verify old password because:
+            // 1. This is first login with default password
+            // 2. Firebase already verified and changed the password
+            // 3. We just sync the new password to database
+            
+            // Hash new password
+            $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+            
+            // Update password in database
+            $updateSql = "UPDATE users SET password = :password WHERE id = :id";
+            $updateStmt = $this->conn->prepare($updateSql);
+            $updateStmt->bindParam(':password', $hashedPassword);
+            $updateStmt->bindParam(':id', $user['id']);
+            
+            if (!$updateStmt->execute()) {
+                throw new Exception("Failed to update password");
+            }
+            
+            // Clear requirePasswordChange flag in database
+            $updateFlagSql = "UPDATE users SET requirePasswordChange = 0 WHERE id = :id";
+            $updateFlagStmt = $this->conn->prepare($updateFlagSql);
+            $updateFlagStmt->bindParam(':id', $user['id']);
+            $updateFlagStmt->execute();
+            
+            return true;
+            
+        } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
+            throw new Exception("Invalid Firebase token: " . $e->getMessage());
+        }
     }
 }
 ?>

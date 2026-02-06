@@ -126,9 +126,72 @@ try {
                 $userService->changePassword($user['id'], $input['oldPassword'], $input['newPassword']);
                 echo json_encode(['success' => true, 'message' => 'Password changed successfully']);
                 
+            } elseif ($action === 'firebase-login') {
+                // Login with Firebase ID token
+                $headers = getallheaders();
+                $firebaseToken = null;
+                
+                if (isset($headers['Authorization'])) {
+                    $firebaseToken = str_replace('Bearer ', '', $headers['Authorization']);
+                }
+                
+                if (!$firebaseToken) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Firebase token is required']);
+                    exit();
+                }
+                
+                $result = $userService->loginWithFirebaseToken($firebaseToken);
+                echo json_encode(['success' => true, 'data' => $result]);
+                
+            } elseif ($action === 'force-change-password') {
+                // Force change password (first login with default password)
+                $headers = getallheaders();
+                $firebaseToken = null;
+                
+                if (isset($headers['Authorization'])) {
+                    $firebaseToken = str_replace('Bearer ', '', $headers['Authorization']);
+                }
+                
+                if (!$firebaseToken) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Firebase token is required']);
+                    exit();
+                }
+                
+                $input = json_decode(file_get_contents('php://input'), true);
+                
+                if (!$input || empty($input['newPassword'])) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'New password is required']);
+                    exit();
+                }
+                
+                $userService->forceChangePassword($firebaseToken, $input['newPassword']);
+                echo json_encode(['success' => true, 'message' => 'Password changed successfully']);
+                
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid action']);
+            }
+            break;
+            
+        case 'GET':
+            // Get user by userName
+            if (count($pathParts) >= 4 && $pathParts[2] === 'user') {
+                $userName = $pathParts[3];
+                $user = $userService->getUserByUserName($userName);
+                
+                if (!$user) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'User not found']);
+                    exit();
+                }
+                
+                echo json_encode(['success' => true, 'data' => $user]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid request']);
             }
             break;
             

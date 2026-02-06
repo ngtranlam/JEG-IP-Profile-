@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield } from 'lucide-react';
-import iegLogo from '../assets/ieg_logo.png';
+import iegLogo from '../assets/Layer2.png';
 
 interface User {
   id: string;

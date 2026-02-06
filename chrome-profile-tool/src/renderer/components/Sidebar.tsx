@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown } from 'lucide-react';
-import iegLogo from '../assets/ieg_logo.png';
+import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar } from 'lucide-react';
+import iegLogo from '../assets/Layer2.png';
+import { TwoFactorSetup } from './TwoFactorSetup';
 
 interface User {
   id: string;
@@ -20,11 +21,14 @@ interface SidebarProps {
 export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: SidebarProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [show2FASetup, setShow2FASetup] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Check if user is Admin (roles="1")
@@ -152,9 +156,19 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
-                    setShowChangePassword(true);
+                    setShowAccountSettings(true);
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserCog className="h-4 w-4" />
+                  Account Settings
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setShowChangePassword(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
                 >
                   <KeyRound className="h-4 w-4" />
                   Change Password
@@ -178,6 +192,128 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
           Version 1.0.0
         </div>
       </div>
+
+      {/* Account Settings Modal */}
+      {showAccountSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="bg-indigo-100 rounded-full p-2 mr-3">
+                  <UserCog className="h-5 w-5 text-indigo-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Account Settings
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAccountSettings(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Account Information Section */}
+            <div className="space-y-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Personal Information
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-start">
+                    <div className="w-32 text-sm text-gray-600">Full Name:</div>
+                    <div className="flex-1 text-sm font-medium text-gray-900">
+                      {currentUser?.fullName}
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-32 text-sm text-gray-600">Username:</div>
+                    <div className="flex-1 text-sm font-medium text-gray-900">
+                      {currentUser?.userName}
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-32 text-sm text-gray-600">
+                      <Mail className="h-3 w-3 inline mr-1" />
+                      Email:
+                    </div>
+                    <div className="flex-1 text-sm font-medium text-gray-900">
+                      {currentUser?.email || 'Not set'}
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-32 text-sm text-gray-600">Role:</div>
+                    <div className="flex-1">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        currentUser?.roles === '1' 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {currentUser?.roles === '1' ? 'Administrator' : 'Seller'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Section - 2FA */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Security Settings
+                </h4>
+                
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <h5 className="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</h5>
+                      {is2FAEnabled && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          Enabled
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!is2FAEnabled) {
+                          // Open setup modal when enabling
+                          setShow2FASetup(true);
+                        } else {
+                          // Confirm before disabling
+                          if (confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.')) {
+                            // TODO: Call API to disable 2FA
+                            setIs2FAEnabled(false);
+                          }
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                        is2FAEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          is2FAEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowAccountSettings(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Change Password Modal */}
       {showChangePassword && (
@@ -314,6 +450,18 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
             </div>
           </div>
         </div>
+      )}
+
+      {/* Two-Factor Setup Modal */}
+      {show2FASetup && (
+        <TwoFactorSetup
+          onSetupComplete={() => {
+            setShow2FASetup(false);
+            setIs2FAEnabled(true);
+            setShowAccountSettings(false);
+          }}
+          onCancel={() => setShow2FASetup(false)}
+        />
       )}
     </div>
   );
