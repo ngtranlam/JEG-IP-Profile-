@@ -43,7 +43,8 @@ export class AuthService {
   constructor(apiBaseUrl: string) {
     this.apiBaseUrl = apiBaseUrl;
     this.tokenFilePath = path.join(app.getPath('userData'), 'auth-token.json');
-    this.loadStoredAuth();
+    // Don't auto-load stored auth - require login on every app start
+    // this.loadStoredAuth();
   }
 
   async login(userName: string, password: string): Promise<LoginResponse> {

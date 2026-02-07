@@ -738,4 +738,12 @@ app.on('before-quit', async () => {
   // Stop auto-sync and cleanup resources
   console.log('Application shutting down...');
   chromeProfileTool.stopAutoSync();
+  
+  // Logout and clear stored auth to require login on next app start
+  try {
+    chromeProfileTool['authService'].logout();
+    console.log('User logged out on app close');
+  } catch (error) {
+    console.error('Failed to logout on app close:', error);
+  }
 });

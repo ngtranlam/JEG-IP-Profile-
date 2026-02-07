@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Shield, Copy, CheckCircle, Download } from 'lucide-react';
 import QRCode from 'qrcode';
+import appIcon from '../assets/app-icon.png';
 
 interface TwoFactorSetupProps {
   onSetupComplete: () => void;
@@ -34,18 +35,78 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
       setQrCodeUrl(result.qrCodeUrl);
       setSecretKey(result.secretKey);
       
-      // Generate QR code image from URI
+      // Generate QR code image from URI with logo overlay
       if (result.qrCodeUrl) {
         try {
+          // Generate base QR code with higher resolution for crisp logo
           const qrDataUrl = await QRCode.toDataURL(result.qrCodeUrl, {
-            width: 256,
+            width: 512, // Higher resolution for better quality
             margin: 2,
+            errorCorrectionLevel: 'H', // High error correction to allow logo overlay
             color: {
               dark: '#000000',
               light: '#FFFFFF'
             }
           });
-          setQrCodeDataUrl(qrDataUrl);
+          
+          // Create canvas to overlay logo
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Disable image smoothing for crisp rendering
+            ctx.imageSmoothingEnabled = false;
+            
+            // Load QR code image
+            const qrImage = new Image();
+            qrImage.onload = () => {
+              canvas.width = qrImage.width;
+              canvas.height = qrImage.height;
+              
+              // Draw QR code
+              ctx.drawImage(qrImage, 0, 0);
+              
+              // Load and draw logo in center
+              const logo = new Image();
+              logo.onload = () => {
+                const logoSize = qrImage.width * 0.2; // Logo is 20% of QR code size
+                const logoX = (qrImage.width - logoSize) / 2;
+                const logoY = (qrImage.height - logoSize) / 2;
+                
+                // Draw white background circle for logo
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(qrImage.width / 2, qrImage.height / 2, logoSize / 2 + 4, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Re-enable smoothing for logo only
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                
+                // Draw logo with high quality
+                ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+                
+                // Set final QR code with logo, scale down to display size
+                const finalCanvas = document.createElement('canvas');
+                const finalCtx = finalCanvas.getContext('2d');
+                if (finalCtx) {
+                  finalCanvas.width = 256;
+                  finalCanvas.height = 256;
+                  finalCtx.imageSmoothingEnabled = true;
+                  finalCtx.imageSmoothingQuality = 'high';
+                  finalCtx.drawImage(canvas, 0, 0, 256, 256);
+                  setQrCodeDataUrl(finalCanvas.toDataURL('image/png', 1.0));
+                } else {
+                  setQrCodeDataUrl(canvas.toDataURL('image/png', 1.0));
+                }
+              };
+              logo.src = appIcon;
+            };
+            qrImage.src = qrDataUrl;
+          } else {
+            // Fallback to QR code without logo
+            setQrCodeDataUrl(qrDataUrl);
+          }
         } catch (qrError) {
           console.error('Failed to generate QR code image:', qrError);
         }
