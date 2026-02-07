@@ -170,6 +170,48 @@ try {
                 $userService->forceChangePassword($firebaseToken, $input['newPassword']);
                 echo json_encode(['success' => true, 'message' => 'Password changed successfully']);
                 
+            } elseif ($action === 'enable-2fa') {
+                // Enable 2FA
+                $headers = getallheaders();
+                $firebaseToken = null;
+                
+                if (isset($headers['Authorization'])) {
+                    $authHeader = $headers['Authorization'];
+                    if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+                        $firebaseToken = $matches[1];
+                    }
+                }
+                
+                if (!$firebaseToken) {
+                    http_response_code(401);
+                    echo json_encode(['error' => 'Unauthorized']);
+                    exit();
+                }
+                
+                $userService->enable2FA($firebaseToken);
+                echo json_encode(['success' => true, 'message' => '2FA enabled successfully']);
+                
+            } elseif ($action === 'disable-2fa') {
+                // Disable 2FA
+                $headers = getallheaders();
+                $firebaseToken = null;
+                
+                if (isset($headers['Authorization'])) {
+                    $authHeader = $headers['Authorization'];
+                    if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+                        $firebaseToken = $matches[1];
+                    }
+                }
+                
+                if (!$firebaseToken) {
+                    http_response_code(401);
+                    echo json_encode(['error' => 'Unauthorized']);
+                    exit();
+                }
+                
+                $userService->disable2FA($firebaseToken);
+                echo json_encode(['success' => true, 'message' => '2FA disabled successfully']);
+                
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid action']);

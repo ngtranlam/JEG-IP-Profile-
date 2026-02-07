@@ -429,16 +429,12 @@ class ChromeProfileTool {
       }
     });
 
-    ipcMain.handle('auth:force-change-password', async (_, userName, newPassword) => {
+    ipcMain.handle('auth:force-change-password', async (_, userName, currentPassword, newPassword) => {
       try {
         console.log(`[ForcePasswordChange] Changing password for user: ${userName}`);
         
-        // Step 1: Generate default password (userName + jeg@123)
-        const defaultPassword = `${userName}jeg@123`;
-        console.log(`[ForcePasswordChange] Using default password for authentication`);
-        
-        // Step 2: Change password in Firebase
-        const changeResult = await this.firebaseService.changePassword(defaultPassword, newPassword);
+        // Step 1: Change password in Firebase using the current password from login
+        const changeResult = await this.firebaseService.changePassword(currentPassword, newPassword);
         if (!changeResult.success) {
           throw new Error(changeResult.error || 'Password change failed');
         }
@@ -514,9 +510,28 @@ class ChromeProfileTool {
       return this.authService.hasPermission(permission);
     });
 
+    ipcMain.handle('auth:send-password-reset-email', async (_, email: string) => {
+      try {
+        const result = await this.firebaseService.sendPasswordResetEmail(email);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to send password reset email');
+        }
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to send password reset email');
+      }
+    });
+
     // Firebase 2FA IPC handlers
     ipcMain.handle('auth:generate2FASecret', async () => {
       try {
+        // Check if Firebase user is authenticated
+        const currentUser = this.firebaseService.getCurrentUser();
+        if (!currentUser) {
+          console.log('[2FA] No Firebase user authenticated');
+          throw new Error('Session expired. Please logout and login again to enable 2FA.');
+        }
+
         const result = await this.firebaseService.generateTOTPSecret();
         if (result.success && result.totpSecret) {
           // Store the TOTP secret temporarily for enrollment
@@ -549,7 +564,25 @@ class ChromeProfileTool {
           // Clear the pending secret after successful enrollment
           this.pendingTotpSecret = null;
           
-          // Generate recovery codes (mock for now, will be implemented later)
+          // Update backend database
+          const firebaseUser = this.firebaseService.getCurrentUser();
+          if (firebaseUser) {
+            const firebaseToken = await firebaseUser.getIdToken();
+            
+            try {
+              await fetch(`${this.apiService['baseUrl']}/auth/enable-2fa`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${firebaseToken}`,
+                }
+              });
+            } catch (err) {
+              console.error('Failed to update 2FA status in database:', err);
+            }
+          }
+          
+          // Generate recovery codes
           const recoveryCodes = Array.from({ length: 8 }, () => 
             Math.random().toString(36).substring(2, 10).toUpperCase()
           );
@@ -577,10 +610,23 @@ class ChromeProfileTool {
           verificationCode
         );
 
-        if (result.success) {
+        if (result.success && result.user) {
           // Clear the pending resolver
           this.pendingMfaResolver = null;
-          return { success: true };
+          
+          // Get Firebase ID token and login to backend
+          console.log('[2FA Verify] Getting Firebase ID token for backend login...');
+          const firebaseToken = await result.user.getIdToken();
+          
+          console.log('[2FA Verify] Calling backend loginWithFirebaseToken...');
+          const loginResult = await this.authService.loginWithFirebaseToken(firebaseToken);
+          console.log('[2FA Verify] Backend login successful');
+          
+          return { 
+            success: true,
+            user: loginResult.user,
+            token: loginResult.token
+          };
         }
 
         throw new Error(result.error || 'Invalid verification code');
@@ -593,6 +639,24 @@ class ChromeProfileTool {
       try {
         const result = await this.firebaseService.disable2FA();
         if (result.success) {
+          // Update backend database
+          const firebaseUser = this.firebaseService.getCurrentUser();
+          if (firebaseUser) {
+            const firebaseToken = await firebaseUser.getIdToken();
+            
+            try {
+              await fetch(`${this.apiService['baseUrl']}/auth/disable-2fa`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${firebaseToken}`,
+                }
+              });
+            } catch (err) {
+              console.error('Failed to update 2FA status in database:', err);
+            }
+          }
+          
           return { success: true };
         }
         throw new Error(result.error || 'Failed to disable 2FA');

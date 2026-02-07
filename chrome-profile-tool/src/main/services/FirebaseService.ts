@@ -7,10 +7,12 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  sendPasswordResetEmail,
   multiFactor,
   TotpMultiFactorGenerator,
   TotpSecret,
   MultiFactorResolver,
+  getMultiFactorResolver,
   UserCredential,
   User as FirebaseUser
 } from 'firebase/auth';
@@ -42,9 +44,25 @@ export class FirebaseService {
         user: userCredential.user
       };
     } catch (error: any) {
+      console.log('[FirebaseService] Sign in error:', {
+        code: error.code,
+        message: error.message,
+        hasResolver: !!error.resolver,
+        hasCustomData: !!error.customData,
+        customDataResolver: !!error.customData?._serverResponse?.mfaPendingCredential
+      });
+      
       // Check if MFA is required
       if (error.code === 'auth/multi-factor-auth-required') {
-        const resolver = error.resolver as MultiFactorResolver;
+        console.log('[FirebaseService] MFA required, extracting resolver');
+        // Use getMultiFactorResolver to get the resolver from the error
+        const resolver = getMultiFactorResolver(this.auth, error);
+        
+        console.log('[FirebaseService] Resolver obtained:', {
+          hasResolver: !!resolver,
+          hintsCount: resolver?.hints?.length || 0
+        });
+        
         return {
           success: false,
           requireMFA: true,
@@ -124,6 +142,34 @@ export class FirebaseService {
   }
 
   /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(email: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      await sendPasswordResetEmail(this.auth, email);
+      return { success: true };
+    } catch (error: any) {
+      let errorMessage = 'Failed to send password reset email';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many requests. Please try again later';
+      }
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
    * Generate TOTP secret for 2FA enrollment
    */
   async generateTOTPSecret(): Promise<{
@@ -137,6 +183,16 @@ export class FirebaseService {
       const user = this.auth.currentUser;
       if (!user) {
         throw new Error('No authenticated user');
+      }
+
+      // Check if user already has TOTP factors enrolled
+      const enrolledFactors = multiFactor(user).enrolledFactors;
+      if (enrolledFactors.length > 0) {
+        console.log(`[FirebaseService] User already has ${enrolledFactors.length} factors enrolled. Unenrolling them first.`);
+        // Unenroll all existing factors to prevent "too many factors" error
+        for (const factor of enrolledFactors) {
+          await multiFactor(user).unenroll(factor);
+        }
       }
 
       const multiFactorSession = await multiFactor(user).getSession();
@@ -254,11 +310,16 @@ export class FirebaseService {
         };
       }
 
-      // Unenroll the first factor (TOTP)
-      await multiFactor(user).unenroll(enrolledFactors[0]);
+      // Unenroll ALL factors (especially TOTP)
+      console.log(`[FirebaseService] Unenrolling ${enrolledFactors.length} factors`);
+      for (const factor of enrolledFactors) {
+        console.log(`[FirebaseService] Unenrolling factor: ${factor.factorId}`);
+        await multiFactor(user).unenroll(factor);
+      }
 
       return { success: true };
     } catch (error: any) {
+      console.error('[FirebaseService] Failed to disable 2FA:', error);
       return {
         success: false,
         error: error.message || 'Failed to disable 2FA'

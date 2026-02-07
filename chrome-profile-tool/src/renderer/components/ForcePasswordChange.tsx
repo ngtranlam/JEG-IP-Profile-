@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { AlertCircle, KeyRound, CheckCircle } from 'lucide-react';
+import { AlertCircle, KeyRound, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import iegLogo from '../assets/Layer2.png';
 import backgroundImage from '../assets/jeg-scaled.jpg';
 
 interface ForcePasswordChangeProps {
   userName: string;
+  currentPassword: string;
   onPasswordChanged: () => void;
   onCancel: () => void;
 }
 
 export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({ 
-  userName, 
+  userName,
+  currentPassword,
   onPasswordChanged,
   onCancel 
 }) => {
@@ -18,6 +20,8 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<{
     hasLength: boolean;
     hasLower: boolean;
@@ -69,7 +73,7 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
     setLoading(true);
 
     try {
-      const result = await window.electronAPI.auth.forceChangePassword(userName, newPassword);
+      const result = await window.electronAPI.auth.forceChangePassword(userName, currentPassword, newPassword);
       if (result.success) {
         onPasswordChanged();
       } else {
@@ -141,31 +145,65 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
             <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-800 mb-2">
               New Password
             </label>
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={handleNewPasswordChange}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white/80 backdrop-blur-sm"
-              placeholder="Enter your new password"
-              required
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                id="newPassword"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={handleNewPasswordChange}
+                className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white/80 backdrop-blur-sm"
+                placeholder="Enter your new password"
+                required
+                autoFocus
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowNewPassword(true)}
+                onMouseUp={() => setShowNewPassword(false)}
+                onMouseLeave={() => setShowNewPassword(false)}
+                onTouchStart={() => setShowNewPassword(true)}
+                onTouchEnd={() => setShowNewPassword(false)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showNewPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-800 mb-2">
               Confirm New Password
             </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white/80 backdrop-blur-sm"
-              placeholder="Confirm your new password"
-              required
-            />
+            <div className="relative">
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white/80 backdrop-blur-sm"
+                placeholder="Confirm your new password"
+                required
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowConfirmPassword(true)}
+                onMouseUp={() => setShowConfirmPassword(false)}
+                onMouseLeave={() => setShowConfirmPassword(false)}
+                onTouchStart={() => setShowConfirmPassword(true)}
+                onTouchEnd={() => setShowConfirmPassword(false)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Password Requirements */}

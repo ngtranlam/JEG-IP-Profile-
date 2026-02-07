@@ -89,7 +89,8 @@ class UserService {
             'phone' => $result['phone'],
             'address' => $result['address'],
             'roles' => $result['roles'],
-            'requirePasswordChange' => $result['requirePasswordChange'] == 1
+            'requirePasswordChange' => $result['requirePasswordChange'] == 1,
+            'is2FAEnabled' => isset($result['is2FAEnabled']) ? $result['is2FAEnabled'] == 1 : false
         ];
     }
 
@@ -233,17 +234,15 @@ class UserService {
             throw new Exception("Username already exists");
         }
 
-        // Generate UUID for user id
-        $userId = $this->generateUUID();
-
         // Hash password
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
         
-        $sql = "INSERT INTO users (id, userName, password, fullName, email, phone, address, roles, status, created_at) 
-                VALUES (:id, :userName, :password, :fullName, :email, :phone, :address, :roles, '1', NOW())";
+        // Step 1: Create user in database with requirePasswordChange flag
+        // Let database auto-generate ID (auto-increment)
+        $sql = "INSERT INTO users (userName, password, fullName, email, phone, address, roles, status, requirePasswordChange, created_at) 
+                VALUES (:userName, :password, :fullName, :email, :phone, :address, :roles, '1', 1, NOW())";
         
         $stmt = $this->conn->prepare($sql);
-        $stmt->bindParam(':id', $userId);
         $stmt->bindParam(':userName', $userName);
         $stmt->bindParam(':password', $hashedPassword);
         $stmt->bindParam(':fullName', $fullName);
@@ -252,11 +251,38 @@ class UserService {
         $stmt->bindParam(':address', $address);
         $stmt->bindParam(':roles', $roles);
         
-        if ($stmt->execute()) {
-            return $userId;
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to create user in database");
         }
         
-        throw new Exception("Failed to create user");
+        // Get the auto-generated ID
+        $userId = $this->conn->lastInsertId();
+        
+        // Step 2: Create user in Firebase Auth
+        if ($this->firebaseAuth) {
+            try {
+                // Use email if provided, otherwise create fake email
+                $firebaseEmail = !empty($email) ? $email : $userName . '@jeg.local';
+                
+                $userProperties = [
+                    'email' => $firebaseEmail,
+                    'emailVerified' => true, // Auto-verify email to allow 2FA enrollment
+                    'password' => $password,
+                    'displayName' => $fullName,
+                    'disabled' => false,
+                ];
+                
+                $createdUser = $this->firebaseAuth->createUser($userProperties);
+                error_log("Created Firebase user: " . $createdUser->uid . " for userName: " . $userName);
+                
+            } catch (Exception $e) {
+                // Log error but don't fail the whole operation
+                error_log("Warning: Failed to create Firebase user for " . $userName . ": " . $e->getMessage());
+                // Note: User can still login with database credentials, but won't have Firebase auth
+            }
+        }
+        
+        return $userId;
     }
 
     /**
@@ -307,7 +333,37 @@ class UserService {
      * Delete user (Admin only)
      */
     public function deleteUser($id) {
-        // Don't allow deleting yourself or the last admin
+        // Step 1: Get user info before deleting
+        $sql = "SELECT userName, email FROM users WHERE id = :id";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            throw new Exception("User not found");
+        }
+        
+        // Step 2: Delete user from Firebase Auth
+        if ($this->firebaseAuth) {
+            try {
+                // Find Firebase user by email
+                $firebaseEmail = !empty($user['email']) ? $user['email'] : $user['userName'] . '@jeg.local';
+                
+                // Get Firebase user by email
+                $firebaseUser = $this->firebaseAuth->getUserByEmail($firebaseEmail);
+                
+                // Delete from Firebase
+                $this->firebaseAuth->deleteUser($firebaseUser->uid);
+                error_log("Deleted Firebase user: " . $firebaseUser->uid . " for userName: " . $user['userName']);
+                
+            } catch (Exception $e) {
+                // Log warning but continue with database deletion
+                error_log("Warning: Failed to delete Firebase user for " . $user['userName'] . ": " . $e->getMessage());
+            }
+        }
+        
+        // Step 3: Delete user from database
         $sql = "DELETE FROM users WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':id', $id);
@@ -517,6 +573,84 @@ class UserService {
             $updateFlagStmt = $this->conn->prepare($updateFlagSql);
             $updateFlagStmt->bindParam(':id', $user['id']);
             $updateFlagStmt->execute();
+            
+            return true;
+            
+        } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
+            throw new Exception("Invalid Firebase token: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Enable 2FA for user
+     */
+    public function enable2FA($firebaseToken) {
+        try {
+            $verifiedIdToken = $this->firebaseAuth->verifyIdToken($firebaseToken);
+            $uid = $verifiedIdToken->claims()->get('sub');
+            
+            // Get user from Firebase
+            $firebaseUser = $this->firebaseAuth->getUser($uid);
+            $email = $firebaseUser->email;
+            
+            // Find user in database by email
+            $sql = "SELECT id FROM users WHERE email = :email";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                throw new Exception("User not found in database");
+            }
+            
+            // Update is2FAEnabled flag
+            $updateSql = "UPDATE users SET is2FAEnabled = 1 WHERE id = :id";
+            $updateStmt = $this->conn->prepare($updateSql);
+            $updateStmt->bindParam(':id', $user['id']);
+            
+            if (!$updateStmt->execute()) {
+                throw new Exception("Failed to enable 2FA");
+            }
+            
+            return true;
+            
+        } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
+            throw new Exception("Invalid Firebase token: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Disable 2FA for user
+     */
+    public function disable2FA($firebaseToken) {
+        try {
+            $verifiedIdToken = $this->firebaseAuth->verifyIdToken($firebaseToken);
+            $uid = $verifiedIdToken->claims()->get('sub');
+            
+            // Get user from Firebase
+            $firebaseUser = $this->firebaseAuth->getUser($uid);
+            $email = $firebaseUser->email;
+            
+            // Find user in database by email
+            $sql = "SELECT id FROM users WHERE email = :email";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                throw new Exception("User not found in database");
+            }
+            
+            // Update is2FAEnabled flag
+            $updateSql = "UPDATE users SET is2FAEnabled = 0 WHERE id = :id";
+            $updateStmt = $this->conn->prepare($updateSql);
+            $updateStmt->bindParam(':id', $user['id']);
+            
+            if (!$updateStmt->execute()) {
+                throw new Exception("Failed to disable 2FA");
+            }
             
             return true;
             

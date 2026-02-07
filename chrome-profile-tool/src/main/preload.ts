@@ -169,8 +169,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     changePassword: (oldPassword: string, newPassword: string) =>
       ipcRenderer.invoke('auth:change-password', oldPassword, newPassword),
     
-    forceChangePassword: (userName: string, newPassword: string) =>
-      ipcRenderer.invoke('auth:force-change-password', userName, newPassword),
+    forceChangePassword: (userName: string, currentPassword: string, newPassword: string) =>
+      ipcRenderer.invoke('auth:force-change-password', userName, currentPassword, newPassword),
+    
+    sendPasswordResetEmail: (email: string) =>
+      ipcRenderer.invoke('auth:send-password-reset-email', email),
     
     validateToken: () => 
       ipcRenderer.invoke('auth:validate-token'),

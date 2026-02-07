@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Shield, Copy, CheckCircle, Download } from 'lucide-react';
+import QRCode from 'qrcode';
 
 interface TwoFactorSetupProps {
   onSetupComplete: () => void;
@@ -12,6 +13,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
 }) => {
   const [step, setStep] = useState<'intro' | 'qr' | 'verify'>('intro');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -28,10 +30,26 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
   const generateTOTPSecret = async () => {
     setLoading(true);
     try {
-      // TODO: Call Firebase to generate TOTP secret
       const result = await window.electronAPI.auth.generate2FASecret();
       setQrCodeUrl(result.qrCodeUrl);
       setSecretKey(result.secretKey);
+      
+      // Generate QR code image from URI
+      if (result.qrCodeUrl) {
+        try {
+          const qrDataUrl = await QRCode.toDataURL(result.qrCodeUrl, {
+            width: 256,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          });
+          setQrCodeDataUrl(qrDataUrl);
+        } catch (qrError) {
+          console.error('Failed to generate QR code image:', qrError);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate 2FA secret');
     } finally {
@@ -186,9 +204,13 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
                 <div className="flex justify-center items-center h-64">
                   <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : qrCodeUrl ? (
+              ) : qrCodeDataUrl ? (
                 <div className="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block">
-                  <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48" />
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="QR Code" 
+                    className="w-64 h-64"
+                  />
                 </div>
               ) : (
                 <div className="bg-gray-100 p-4 rounded-lg h-64 flex items-center justify-center">

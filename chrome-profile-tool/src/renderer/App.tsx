@@ -19,6 +19,7 @@ function App() {
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
   const [require2FA, setRequire2FA] = useState(false);
   const [pendingUserName, setPendingUserName] = useState('');
+  const [pendingPassword, setPendingPassword] = useState('');
   const [goLoginStats, setGoLoginStats] = useState({
     totalProfiles: 0,
     runningProfiles: 0,
@@ -101,6 +102,7 @@ function App() {
     if (loginResult?.requirePasswordChange) {
       setRequirePasswordChange(true);
       setPendingUserName(loginResult.userName);
+      setPendingPassword(loginResult.currentPassword || '');
       return;
     }
 
@@ -113,10 +115,12 @@ function App() {
 
     // Normal login flow
     setIsAuthenticated(true);
-    // Get user info after successful login
+    // Get user info after successful login - use validateToken to get full user data including is2FAEnabled
     try {
-      const user = await window.electronAPI.auth.getCurrentUser();
-      setCurrentUser(user);
+      const userData = await window.electronAPI.auth.validateToken();
+      console.log('[App] Setting currentUser after login:', userData);
+      console.log('[App] is2FAEnabled value:', userData?.is2FAEnabled);
+      setCurrentUser(userData);
     } catch (error) {
       console.error('Failed to get current user:', error);
     }
@@ -135,12 +139,15 @@ function App() {
     }
   };
 
-  const handle2FAVerified = async () => {
+  const handle2FAVerified = async (loginResult?: any) => {
     setRequire2FA(false);
     setIsAuthenticated(true);
     try {
-      const user = await window.electronAPI.auth.getCurrentUser();
-      setCurrentUser(user);
+      // Use validateToken to get full user data including is2FAEnabled
+      const userData = await window.electronAPI.auth.validateToken();
+      console.log('[App] Setting currentUser after 2FA verification:', userData);
+      console.log('[App] is2FAEnabled value:', userData?.is2FAEnabled);
+      setCurrentUser(userData);
     } catch (error) {
       console.error('Failed to get current user:', error);
     }
@@ -217,6 +224,7 @@ function App() {
     return (
       <ForcePasswordChange
         userName={pendingUserName}
+        currentPassword={pendingPassword}
         onPasswordChanged={handlePasswordChanged}
         onCancel={handleCancelAuth}
       />

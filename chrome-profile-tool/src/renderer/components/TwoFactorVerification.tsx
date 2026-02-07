@@ -76,9 +76,9 @@ export const TwoFactorVerification: React.FC<TwoFactorVerificationProps> = ({
     setError('');
 
     try {
-      // TODO: Call Firebase 2FA verification API
-      await window.electronAPI.auth.verify2FA(userName, codeToVerify);
-      onVerificationSuccess();
+      const result = await window.electronAPI.auth.verify2FA(userName, codeToVerify);
+      console.log('[2FA Verification] Success, user data:', result);
+      onVerificationSuccess(result);
     } catch (err: any) {
       let errorMsg = err.message || 'Invalid verification code';
       if (errorMsg.includes('Error:')) {

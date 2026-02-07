@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar } from 'lucide-react';
+import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar, Eye, EyeOff } from 'lucide-react';
 import iegLogo from '../assets/Layer2.png';
 import { TwoFactorSetup } from './TwoFactorSetup';
 
@@ -28,11 +28,23 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Check if user is Admin (roles="1")
   const isAdmin = currentUser?.roles === '1';
+
+  // Check 2FA status from currentUser
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[Sidebar] Current user:', currentUser);
+      console.log('[Sidebar] is2FAEnabled value:', (currentUser as any).is2FAEnabled);
+      setIs2FAEnabled((currentUser as any).is2FAEnabled === true);
+    }
+  }, [currentUser]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,6 +86,24 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
         errorMsg = errorMsg.split('Error:').pop()?.trim() || errorMsg;
       }
       setErrorMessage(errorMsg);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.')) {
+      return;
+    }
+
+    try {
+      await window.electronAPI.auth.disable2FA();
+      setIs2FAEnabled(false);
+      alert('Two-Factor Authentication has been disabled successfully');
+    } catch (error: any) {
+      let errorMsg = error.message || 'Failed to disable 2FA';
+      if (errorMsg.includes('Error:')) {
+        errorMsg = errorMsg.split('Error:').pop()?.trim() || errorMsg;
+      }
+      alert('Error: ' + errorMsg);
     }
   };
   
@@ -281,11 +311,8 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
                           // Open setup modal when enabling
                           setShow2FASetup(true);
                         } else {
-                          // Confirm before disabling
-                          if (confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.')) {
-                            // TODO: Call API to disable 2FA
-                            setIs2FAEnabled(false);
-                          }
+                          // Call handler to disable 2FA
+                          handleDisable2FA();
                         }
                       }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
@@ -354,39 +381,90 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Current Password
                 </label>
-                <input
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter current password"
-                />
+                <div className="relative">
+                  <input
+                    type={showOldPassword ? "text" : "password"}
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter current password"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowOldPassword(true)}
+                    onMouseUp={() => setShowOldPassword(false)}
+                    onMouseLeave={() => setShowOldPassword(false)}
+                    onTouchStart={() => setShowOldPassword(true)}
+                    onTouchEnd={() => setShowOldPassword(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showOldPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   New Password
                 </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter new password"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter new password"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowNewPassword(true)}
+                    onMouseUp={() => setShowNewPassword(false)}
+                    onMouseLeave={() => setShowNewPassword(false)}
+                    onTouchStart={() => setShowNewPassword(true)}
+                    onTouchEnd={() => setShowNewPassword(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Confirm new password"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Confirm new password"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowConfirmPassword(true)}
+                    onMouseUp={() => setShowConfirmPassword(false)}
+                    onMouseLeave={() => setShowConfirmPassword(false)}
+                    onTouchStart={() => setShowConfirmPassword(true)}
+                    onTouchEnd={() => setShowConfirmPassword(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
             
