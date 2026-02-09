@@ -90,7 +90,7 @@ try {
                 
                 echo json_encode(['success' => true, 'data' => $user]);
                 
-            } elseif ($action === 'permissions') {
+            } elseif ($action === 'permissions') { 
                 // Get user permissions
                 $authMiddleware = new AuthMiddleware();
                 $user = $authMiddleware->handleRequest();

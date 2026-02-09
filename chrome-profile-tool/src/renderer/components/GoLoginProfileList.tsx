@@ -61,6 +61,28 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
   const [proxyLocations, setProxyLocations] = useState<any[]>([]);
   const [runningProfiles, setRunningProfiles] = useState<Set<string>>(new Set());
   const [checkingProfiles, setCheckingProfiles] = useState<Set<string>>(new Set());
+  const [stoppingProfiles, setStoppingProfiles] = useState<Set<string>>(new Set());
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteValue, setEditingNoteValue] = useState<string>('');
+
+  // Listen for browser closed events
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onBrowserClosed((profileId: string) => {
+      console.log(`Browser closed manually for profile: ${profileId}`);
+      // Remove from running profiles
+      setRunningProfiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(profileId);
+        return newSet;
+      });
+      // Refresh profiles list
+      loadProfiles();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Helper function to get country flag and name
   const getCountryInfo = (countryCode: string) => {
@@ -579,6 +601,9 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
 
   const handleStopProfile = async (profileId: string) => {
     try {
+      // Add to stopping profiles
+      setStoppingProfiles(prev => new Set(prev).add(profileId));
+      
       await window.electronAPI.gologinStopProfile(profileId);
       
       // Remove from running profiles
@@ -593,6 +618,59 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     } catch (error) {
       console.error('Failed to stop profile:', error);
       alert('Failed to stop profile. Please try again.');
+    } finally {
+      // Remove from stopping profiles
+      setStoppingProfiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(profileId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleNoteDoubleClick = (profileId: string, currentNote: string) => {
+    setEditingNoteId(profileId);
+    setEditingNoteValue(currentNote || '');
+  };
+
+  const handleNoteSave = async (profileId: string) => {
+    if (editingNoteId !== profileId) return;
+
+    try {
+      // Update profile notes via API
+      await window.electronAPI.localDataUpdateProfile(profileId, {
+        notes: editingNoteValue
+      });
+
+      // Update local state
+      setProfiles(prevProfiles =>
+        prevProfiles.map(p =>
+          p.id === profileId ? { ...p, notes: editingNoteValue } : p
+        )
+      );
+
+      // Exit edit mode
+      setEditingNoteId(null);
+      setEditingNoteValue('');
+    } catch (error) {
+      console.error('Failed to update note:', error);
+      alert('Failed to save note. Please try again.');
+      // Reload profiles to sync state
+      await loadProfiles();
+    }
+  };
+
+  const handleNoteBlur = (profileId: string) => {
+    handleNoteSave(profileId);
+  };
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent, profileId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleNoteSave(profileId);
+    } else if (e.key === 'Escape') {
+      setEditingNoteId(null);
+      setEditingNoteValue('');
     }
   };
 
@@ -789,9 +867,20 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                           {isRunning && (
                             <button
                               onClick={() => handleStopProfile(profile.id)}
-                              className="px-3 py-1 bg-red-100 text-red-800 text-xs rounded hover:bg-red-200 transition-colors"
+                              disabled={stoppingProfiles.has(profile.id)}
+                              className={`px-3 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                                stoppingProfiles.has(profile.id)
+                                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                  : 'bg-red-100 text-red-800 hover:bg-red-200'
+                              }`}
                             >
-                              Stop
+                              {stoppingProfiles.has(profile.id) && (
+                                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              )}
+                              {stoppingProfiles.has(profile.id) ? 'Stopping...' : 'Stop'}
                             </button>
                           )}
                           <div className="flex items-center">
@@ -815,9 +904,25 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
 
                   {/* Notes */}
                   <div className="col-span-3 flex items-center">
-                    <span className="text-xs text-blue-600 truncate">
-                      {profile.notes || 'select text for formatting...'}
-                    </span>
+                    {editingNoteId === profile.id ? (
+                      <input
+                        type="text"
+                        value={editingNoteValue}
+                        onChange={(e) => setEditingNoteValue(e.target.value)}
+                        onBlur={() => handleNoteBlur(profile.id)}
+                        onKeyDown={(e) => handleNoteKeyDown(e, profile.id)}
+                        className="w-full px-2 py-1 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => handleNoteDoubleClick(profile.id, profile.notes || '')}
+                        className="text-xs text-blue-600 truncate cursor-pointer hover:bg-blue-50 px-2 py-1 rounded w-full"
+                        title="Double-click to edit"
+                      >
+                        {profile.notes || 'select text for formatting...'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Location */}

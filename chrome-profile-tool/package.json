@@ -89,7 +89,15 @@
     "files": [
       "dist/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      ".env"
+    ],
+    "asarUnpack": [
+      "node_modules/gologin/**/*",
+      "node_modules/sqlite3/**/*",
+      "node_modules/puppeteer/**/*",
+      "node_modules/puppeteer-core/**/*",
+      "node_modules/playwright/**/*"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",

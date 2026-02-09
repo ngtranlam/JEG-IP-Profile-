@@ -1,14 +1,34 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import { ApiService } from './services/ApiService';
 import { AuthService } from './services/AuthService';
 import { AutoSyncService } from './services/AutoSyncService';
 import { FirebaseService } from './services/FirebaseService';
 import { TotpSecret, MultiFactorResolver } from 'firebase/auth';
 
-// Load .env from project root (2 levels up from dist/main/main/)
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
+// Load .env from multiple possible locations
+const possibleEnvPaths = [
+  path.join(__dirname, '../../../.env'), // Dev mode
+  path.join(process.resourcesPath, '.env'), // Production (inside app)
+  path.join(app.getPath('userData'), '.env'), // User data directory
+  path.join(process.cwd(), '.env'), // Current working directory
+];
+
+for (const envPath of possibleEnvPaths) {
+  if (fs.existsSync(envPath)) {
+    console.log(`Loading .env from: ${envPath}`);
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
+
+// Verify GOLOGIN_API_TOKEN is loaded
+if (!process.env.GOLOGIN_API_TOKEN) {
+  console.warn('WARNING: GOLOGIN_API_TOKEN not found in environment variables');
+  console.warn('Checked paths:', possibleEnvPaths);
+}
 
 class ChromeProfileTool {
   private mainWindow: BrowserWindow | null = null;
@@ -29,6 +49,14 @@ class ChromeProfileTool {
 
   async initialize() {
     this.setupIPC();
+    
+    // Setup callback to notify renderer when browser is closed manually
+    this.apiService.setupBrowserClosedCallback((profileId: string) => {
+      console.log(`Browser closed manually for profile: ${profileId}`);
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('browser-closed', profileId);
+      }
+    });
   }
 
   createWindow() {
@@ -696,6 +724,47 @@ class ChromeProfileTool {
       this.autoSyncService.setSyncInterval(minutes);
       return { success: true };
     });
+
+    // GoLogin SDK IPC handlers
+    ipcMain.handle('gologin-sdk:create-profile', async (_, name, os) => {
+      return await this.apiService.gologinSDKCreateProfile(name, os);
+    });
+
+    ipcMain.handle('gologin-sdk:create-profile-with-params', async (_, params) => {
+      return await this.apiService.gologinSDKCreateProfileWithParams(params);
+    });
+
+    ipcMain.handle('gologin-sdk:add-proxy', async (_, profileId, countryCode) => {
+      return await this.apiService.gologinSDKAddProxyToProfile(profileId, countryCode);
+    });
+
+    ipcMain.handle('gologin-sdk:change-proxy', async (_, profileId, proxy) => {
+      return await this.apiService.gologinSDKChangeProfileProxy(profileId, proxy);
+    });
+
+    ipcMain.handle('gologin-sdk:add-cookies', async (_, profileId, cookies) => {
+      return await this.apiService.gologinSDKAddCookies(profileId, cookies);
+    });
+
+    ipcMain.handle('gologin-sdk:refresh-fingerprints', async (_, profileIds) => {
+      return await this.apiService.gologinSDKRefreshFingerprints(profileIds);
+    });
+
+    ipcMain.handle('gologin-sdk:update-user-agent', async (_, profileIds, workspaceId) => {
+      return await this.apiService.gologinSDKUpdateUserAgent(profileIds, workspaceId);
+    });
+
+    ipcMain.handle('gologin-sdk:get-active-browsers', async () => {
+      return await this.apiService.gologinSDKGetActiveBrowsers();
+    });
+
+    ipcMain.handle('gologin-sdk:is-profile-running', async (_, profileId) => {
+      return await this.apiService.gologinSDKIsProfileRunning(profileId);
+    });
+
+    ipcMain.handle('gologin-sdk:stop-all-profiles', async () => {
+      return await this.apiService.gologinSDKStopAllProfiles();
+    });
   }
 
   startAutoSync() {
@@ -738,6 +807,14 @@ app.on('before-quit', async () => {
   // Stop auto-sync and cleanup resources
   console.log('Application shutting down...');
   chromeProfileTool.stopAutoSync();
+  
+  // Cleanup GoLogin SDK (stop all browsers)
+  try {
+    await chromeProfileTool['apiService'].cleanup();
+    console.log('GoLogin SDK cleanup completed');
+  } catch (error) {
+    console.error('Failed to cleanup GoLogin SDK:', error);
+  }
   
   // Logout and clear stored auth to require login on next app start
   try {

@@ -1,16 +1,33 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { GoLoginSDKService } from './GoLoginSDKService';
 
 // Load .env from project root
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 export class ApiService {
   private baseUrl: string;
+  private gologinSDK: GoLoginSDKService | null = null;
 
   constructor() {
     // Use production URL by default, fallback to env variable for development
     this.baseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
     console.log('API Service initialized with base URL:', this.baseUrl);
+    
+    // Initialize GoLogin SDK if token is available
+    const gologinToken = process.env.GOLOGIN_API_TOKEN;
+    if (gologinToken) {
+      this.gologinSDK = new GoLoginSDKService(gologinToken);
+      console.log('GoLogin SDK initialized');
+    } else {
+      console.warn('GOLOGIN_API_TOKEN not found in environment variables');
+    }
+  }
+
+  setupBrowserClosedCallback(callback: (profileId: string) => void) {
+    if (this.gologinSDK) {
+      this.gologinSDK.setOnBrowserClosed(callback);
+    }
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -193,74 +210,48 @@ export class ApiService {
   }
 
   async gologinLaunchProfile(profileId: string, options?: any): Promise<any> {
-    // Launch profile must use Local Rest API, not Cloud API
     try {
-      console.log(`Launching GoLogin profile locally: ${profileId}`);
+      console.log(`Launching GoLogin profile: ${profileId}`);
       
-      const response = await fetch('http://localhost:36912/browser/start-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileId: profileId,
-          sync: true,
-          ...options
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Local launch profile API error:', errorText);
-        throw new Error(`Failed to launch profile locally: ${response.statusText} - ${errorText}`);
+      if (!this.gologinSDK) {
+        throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
       }
 
-      const data = await response.json();
-      console.log('Profile launched successfully:', data);
+      const result = await this.gologinSDK.launchProfile(profileId, options);
+      console.log('Profile launched successfully via SDK:', {
+        hasWsEndpoint: !!result.wsEndpoint,
+        profileId: result.profileId
+      });
       
+      // Don't return browser object - it can't be serialized over IPC
       return {
-        browser: data.browser || null,
-        wsEndpoint: data.wsUrl || '' 
+        status: 'success',
+        profileId: result.profileId,
+        wsEndpoint: result.wsEndpoint || '',
+        message: 'Profile launched successfully'
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error launching profile ${profileId}:`, error);
-      throw error;
+      throw new Error(`Failed to launch profile: ${error.message || error}`);
     }
   }
 
   async gologinStopProfile(profileId: string): Promise<any> {
-    // Stop profile must use Local Rest API, not Cloud API
     try {
-      console.log(`Stopping GoLogin profile locally: ${profileId}`);
+      console.log(`Stopping GoLogin profile: ${profileId}`);
       
-      const response = await fetch('http://localhost:36912/browser/stop-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileId: profileId
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Local stop profile API error:', errorText);
-        throw new Error(`Failed to stop profile locally: ${response.statusText} - ${errorText}`);
+      if (!this.gologinSDK) {
+        throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
       }
 
-      // Stop profile returns 204 No Content (empty response)
-      if (response.status === 204) {
-        console.log('Profile stopped successfully (204 No Content)');
-        return { status: 'success', message: 'Profile stopped' };
-      }
-
-      const data = await response.json();
-      console.log('Profile stopped successfully:', data);
-      return data;
-    } catch (error) {
+      await this.gologinSDK.stopProfile(profileId);
+      console.log('Profile stopped successfully via SDK');
+      
+      return { status: 'success', message: 'Profile stopped' };
+    } catch (error: any) {
       console.error(`Error stopping profile ${profileId}:`, error);
-      throw error;
+      // Don't throw error for stop - just log it
+      return { status: 'error', message: error.message || 'Failed to stop profile' };
     }
   }
 
@@ -545,5 +536,82 @@ export class ApiService {
       method: 'GET',
     });
     return response.data;
+  }
+
+  // GoLogin SDK methods
+  async gologinSDKCreateProfile(name: string, os: 'win' | 'mac' | 'lin' = 'win'): Promise<any> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    return await this.gologinSDK.createProfileRandomFingerprint(name, os);
+  }
+
+  async gologinSDKCreateProfileWithParams(params: any): Promise<any> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    return await this.gologinSDK.createProfileWithCustomParams(params);
+  }
+
+  async gologinSDKAddProxyToProfile(profileId: string, countryCode: string): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.addGologinProxyToProfile(profileId, countryCode);
+  }
+
+  async gologinSDKChangeProfileProxy(profileId: string, proxy: any): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.changeProfileProxy(profileId, proxy);
+  }
+
+  async gologinSDKAddCookies(profileId: string, cookies: any[]): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.addCookiesToProfile(profileId, cookies);
+  }
+
+  async gologinSDKRefreshFingerprints(profileIds: string[]): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.refreshProfilesFingerprint(profileIds);
+  }
+
+  async gologinSDKUpdateUserAgent(profileIds: string[], workspaceId?: string): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.updateUserAgentToLatestBrowser(profileIds, workspaceId);
+  }
+
+  async gologinSDKGetActiveBrowsers(): Promise<string[]> {
+    if (!this.gologinSDK) {
+      return [];
+    }
+    return this.gologinSDK.getActiveBrowsers();
+  }
+
+  async gologinSDKIsProfileRunning(profileId: string): Promise<boolean> {
+    if (!this.gologinSDK) {
+      return false;
+    }
+    return this.gologinSDK.isProfileRunning(profileId);
+  }
+
+  async gologinSDKStopAllProfiles(): Promise<void> {
+    if (!this.gologinSDK) {
+      throw new Error('GoLogin SDK not initialized. Please set GOLOGIN_API_TOKEN in .env file');
+    }
+    await this.gologinSDK.stopAllProfiles();
+  }
+
+  async cleanup(): Promise<void> {
+    if (this.gologinSDK) {
+      await this.gologinSDK.cleanup();
+    }
   }
 }

@@ -321,9 +321,27 @@ class GoLoginDataService {
     }
 
     /**
+     * Update profile notes in database only (local field, not synced to GoLogin)
+     */
+    public function updateProfileNotes($profileId, $notes) {
+        $sql = "UPDATE gologin_profiles SET notes = :notes, updated_at = NOW() WHERE profile_id = :profile_id";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':notes', $notes);
+        $stmt->bindParam(':profile_id', $profileId);
+        $stmt->execute();
+        
+        return ['success' => true, 'profile_id' => $profileId, 'notes' => $notes];
+    }
+
+    /**
      * Update profile in GoLogin and sync to database
      */
     public function updateProfileWithSync($profileId, $profileData) {
+        // If only updating notes, use local update instead
+        if (count($profileData) === 1 && isset($profileData['notes'])) {
+            return $this->updateProfileNotes($profileId, $profileData['notes']);
+        }
+        
         require_once __DIR__ . '/../config/gologin.php';
         $gologinAPI = new GoLoginAPI();
         

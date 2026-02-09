@@ -158,6 +158,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
   localDataToggleUserStatus: (userId: number) => 
     ipcRenderer.invoke('local-data:toggle-user-status', userId),
 
+  // GoLogin SDK methods
+  gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') =>
+    ipcRenderer.invoke('gologin-sdk:create-profile', name, os),
+  
+  gologinSDKCreateProfileWithParams: (params: any) =>
+    ipcRenderer.invoke('gologin-sdk:create-profile-with-params', params),
+  
+  gologinSDKAddProxy: (profileId: string, countryCode: string) =>
+    ipcRenderer.invoke('gologin-sdk:add-proxy', profileId, countryCode),
+  
+  gologinSDKChangeProxy: (profileId: string, proxy: any) =>
+    ipcRenderer.invoke('gologin-sdk:change-proxy', profileId, proxy),
+  
+  gologinSDKAddCookies: (profileId: string, cookies: any[]) =>
+    ipcRenderer.invoke('gologin-sdk:add-cookies', profileId, cookies),
+  
+  gologinSDKRefreshFingerprints: (profileIds: string[]) =>
+    ipcRenderer.invoke('gologin-sdk:refresh-fingerprints', profileIds),
+  
+  gologinSDKUpdateUserAgent: (profileIds: string[], workspaceId?: string) =>
+    ipcRenderer.invoke('gologin-sdk:update-user-agent', profileIds, workspaceId),
+  
+  gologinSDKGetActiveBrowsers: () =>
+    ipcRenderer.invoke('gologin-sdk:get-active-browsers'),
+  
+  gologinSDKIsProfileRunning: (profileId: string) =>
+    ipcRenderer.invoke('gologin-sdk:is-profile-running', profileId),
+  
+  gologinSDKStopAllProfiles: () =>
+    ipcRenderer.invoke('gologin-sdk:stop-all-profiles'),
+
+  // Event listeners
+  onBrowserClosed: (callback: (profileId: string) => void) => {
+    const listener = (_event: any, profileId: string) => callback(profileId);
+    ipcRenderer.on('browser-closed', listener);
+    return () => ipcRenderer.removeListener('browser-closed', listener);
+  },
+
   // Authentication
   auth: {
     login: (userName: string, password: string) => 
@@ -285,6 +323,21 @@ declare global {
       localDataUpdateUser: (userData: any) => Promise<void>;
       localDataDeleteUser: (userId: number) => Promise<void>;
       localDataToggleUserStatus: (userId: number) => Promise<void>;
+      
+      // GoLogin SDK methods
+      gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') => Promise<any>;
+      gologinSDKCreateProfileWithParams: (params: any) => Promise<any>;
+      gologinSDKAddProxy: (profileId: string, countryCode: string) => Promise<void>;
+      gologinSDKChangeProxy: (profileId: string, proxy: any) => Promise<void>;
+      gologinSDKAddCookies: (profileId: string, cookies: any[]) => Promise<void>;
+      gologinSDKRefreshFingerprints: (profileIds: string[]) => Promise<void>;
+      gologinSDKUpdateUserAgent: (profileIds: string[], workspaceId?: string) => Promise<void>;
+      gologinSDKGetActiveBrowsers: () => Promise<string[]>;
+      gologinSDKIsProfileRunning: (profileId: string) => Promise<boolean>;
+      gologinSDKStopAllProfiles: () => Promise<void>;
+      
+      // Event listeners
+      onBrowserClosed: (callback: (profileId: string) => void) => () => void;
       
       // Authentication
       auth: {

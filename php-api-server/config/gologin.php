@@ -66,10 +66,26 @@ class GoLoginAPI {
         if ($httpCode >= 400) {
             $errorMessage = 'Unknown error';
             if (is_array($decodedResponse)) {
-                $errorMessage = isset($decodedResponse['message']) ? $decodedResponse['message'] : json_encode($decodedResponse);
+                // Try to extract error message from various possible fields
+                if (isset($decodedResponse['message'])) {
+                    $errorMessage = $decodedResponse['message'];
+                } elseif (isset($decodedResponse['error'])) {
+                    $errorMessage = is_array($decodedResponse['error']) ? json_encode($decodedResponse['error']) : $decodedResponse['error'];
+                } elseif (isset($decodedResponse['errors'])) {
+                    $errorMessage = is_array($decodedResponse['errors']) ? implode(', ', $decodedResponse['errors']) : $decodedResponse['errors'];
+                } else {
+                    // If no standard error field, show the entire response
+                    $errorMessage = json_encode($decodedResponse, JSON_PRETTY_PRINT);
+                }
             } elseif (is_string($decodedResponse)) {
                 $errorMessage = $decodedResponse;
+            } else {
+                $errorMessage = $response; // Show raw response if not JSON
             }
+            
+            // Log the full error for debugging
+            error_log("GoLogin API Error (HTTP $httpCode): " . $errorMessage);
+            
             throw new Exception("GoLogin API error: " . $errorMessage);
         }
 
