@@ -12,6 +12,9 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: chrome-profile-tool
     
     steps:
       - name: Checkout code
@@ -22,6 +25,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: chrome-profile-tool/package-lock.json
       
       - name: Install dependencies
         run: npm ci
@@ -36,12 +40,15 @@ jobs:
         with:
           name: windows-build
           path: |
-            release/*.exe
-            release/*.zip
+            chrome-profile-tool/release/*.exe
+            chrome-profile-tool/release/*.zip
           retention-days: 30
 
   build-macos:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: chrome-profile-tool
     
     steps:
       - name: Checkout code
@@ -52,6 +59,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: chrome-profile-tool/package-lock.json
       
       - name: Install dependencies
         run: npm ci
@@ -66,8 +74,8 @@ jobs:
         with:
           name: macos-build
           path: |
-            release/*.dmg
-            release/*.zip
+            chrome-profile-tool/release/*.dmg
+            chrome-profile-tool/release/*.zip
           retention-days: 30
 
   release:
