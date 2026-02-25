@@ -30,6 +30,10 @@
   ],
   "author": "JEG Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ngtranlam/JEG-IP-Profile-.git"
+  },
   "devDependencies": {
     "@types/node": "^20.19.31",
     "@types/qrcode": "^1.5.6",
