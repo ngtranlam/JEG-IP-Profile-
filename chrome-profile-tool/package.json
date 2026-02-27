@@ -95,7 +95,9 @@
     "files": [
       "dist/**/*",
       "node_modules/**/*",
-      "package.json",
+      "package.json"
+    ],
+    "extraResources": [
       ".env"
     ],
     "asarUnpack": [

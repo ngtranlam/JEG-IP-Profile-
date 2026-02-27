@@ -11,23 +11,35 @@ import { TotpSecret, MultiFactorResolver } from 'firebase/auth';
 // Load .env from multiple possible locations
 const possibleEnvPaths = [
   path.join(__dirname, '../../../.env'), // Dev mode
-  path.join(process.resourcesPath, '.env'), // Production (inside app)
+  path.join(process.resourcesPath, '.env'), // Production - extraResources
+  path.join(process.resourcesPath, 'app', '.env'), // Alternative path
   path.join(app.getPath('userData'), '.env'), // User data directory
   path.join(process.cwd(), '.env'), // Current working directory
 ];
 
+console.log('=== Environment Loading ===');
+console.log('process.resourcesPath:', process.resourcesPath);
+console.log('__dirname:', __dirname);
+console.log('process.cwd():', process.cwd());
+console.log('Checking .env paths:');
+
+let envLoaded = false;
 for (const envPath of possibleEnvPaths) {
-  if (fs.existsSync(envPath)) {
-    console.log(`Loading .env from: ${envPath}`);
+  const exists = fs.existsSync(envPath);
+  console.log(`  ${envPath}: ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+  if (exists && !envLoaded) {
+    console.log(`✓ Loading .env from: ${envPath}`);
     dotenv.config({ path: envPath });
-    break;
+    envLoaded = true;
   }
 }
 
 // Verify GOLOGIN_API_TOKEN is loaded
 if (!process.env.GOLOGIN_API_TOKEN) {
-  console.warn('WARNING: GOLOGIN_API_TOKEN not found in environment variables');
-  console.warn('Checked paths:', possibleEnvPaths);
+  console.error('❌ GOLOGIN_API_TOKEN not found in environment variables');
+  console.error('Please ensure .env file exists in one of the checked paths');
+} else {
+  console.log('✓ GOLOGIN_API_TOKEN loaded successfully');
 }
 
 class ChromeProfileTool {
@@ -77,7 +89,12 @@ class ChromeProfileTool {
     // Load the React app
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
-      this.mainWindow.loadURL('http://localhost:3000');
+      this.mainWindow.loadURL(
+        isDev
+          ? 'http://localhost:5173'
+          : `file://${path.join(__dirname, '../../renderer/index.html')}`
+      );
+      // TEMPORARY: Open DevTools for debugging
       this.mainWindow.webContents.openDevTools();
     } else {
       this.mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
