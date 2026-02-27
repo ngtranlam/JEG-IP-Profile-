@@ -27,6 +27,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: chrome-profile-tool/package-lock.json
       
+      - name: Create .env file
+        run: |
+          echo "GOLOGIN_API_TOKEN=${{ secrets.GOLOGIN_API_TOKEN }}" > .env
+          echo "API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
+        working-directory: chrome-profile-tool
+      
       - name: Install dependencies
         run: npm ci
       
@@ -60,6 +66,12 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: chrome-profile-tool/package-lock.json
+      
+      - name: Create .env file
+        run: |
+          echo "GOLOGIN_API_TOKEN=${{ secrets.GOLOGIN_API_TOKEN }}" > .env
+          echo "API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
+        working-directory: chrome-profile-tool
       
       - name: Install dependencies
         run: npm ci
