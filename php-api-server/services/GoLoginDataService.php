@@ -337,16 +337,17 @@ class GoLoginDataService {
      * Update profile in GoLogin and sync to database
      */
     public function updateProfileWithSync($profileId, $profileData) {
-        // If only updating notes, use local update instead
-        if (count($profileData) === 1 && isset($profileData['notes'])) {
-            return $this->updateProfileNotes($profileId, $profileData['notes']);
-        }
-        
         require_once __DIR__ . '/../config/gologin.php';
         $gologinAPI = new GoLoginAPI();
         
-        // Update in GoLogin first
-        $updatedProfile = $gologinAPI->updateProfile($profileId, $profileData);
+        // Get current profile data from GoLogin
+        $currentProfile = $gologinAPI->getProfile($profileId);
+        
+        // Merge new data with existing profile (preserving required fields)
+        $mergedData = array_merge($currentProfile, $profileData);
+        
+        // Update in GoLogin with merged data
+        $updatedProfile = $gologinAPI->updateProfile($profileId, $mergedData);
         
         // Sync to database
         require_once __DIR__ . '/GoLoginSyncService.php';

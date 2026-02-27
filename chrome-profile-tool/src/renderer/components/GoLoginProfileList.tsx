@@ -84,6 +84,60 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     };
   }, []);
 
+  // Helper function to detect country from IP address
+  const getCountryFromIP = (ip: string): string | null => {
+    if (!ip) return null;
+    
+    // Parse IP to number for range checking
+    const ipParts = ip.split('.').map(Number);
+    if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) {
+      return null;
+    }
+    
+    const ipNum = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
+    
+    // Common IP ranges for major countries (simplified detection)
+    // US ranges
+    if ((ipNum >= 0x03000000 && ipNum <= 0x06FFFFFF) || // 3.0.0.0 - 6.255.255.255
+        (ipNum >= 0x08000000 && ipNum <= 0x0FFFFFFF) || // 8.0.0.0 - 15.255.255.255
+        (ipNum >= 0x17000000 && ipNum <= 0x18FFFFFF) || // 23.0.0.0 - 24.255.255.255
+        (ipNum >= 0x32000000 && ipNum <= 0x33FFFFFF) || // 50.0.0.0 - 51.255.255.255
+        (ipNum >= 0x41000000 && ipNum <= 0x42FFFFFF)) { // 65.0.0.0 - 66.255.255.255
+      return 'US';
+    }
+    
+    // Vietnam ranges
+    if ((ipNum >= 0x0E000000 && ipNum <= 0x0EFFFFFF) || // 14.0.0.0 - 14.255.255.255
+        (ipNum >= 0x1B000000 && ipNum <= 0x1BFFFFFF) || // 27.0.0.0 - 27.255.255.255
+        (ipNum >= 0x31000000 && ipNum <= 0x31FFFFFF) || // 49.0.0.0 - 49.255.255.255
+        (ipNum >= 0x5E000000 && ipNum <= 0x5EFFFFFF)) { // 94.0.0.0 - 94.255.255.255
+      return 'VN';
+    }
+    
+    // UK ranges
+    if ((ipNum >= 0x02000000 && ipNum <= 0x02FFFFFF) || // 2.0.0.0 - 2.255.255.255
+        (ipNum >= 0x51000000 && ipNum <= 0x52FFFFFF)) { // 81.0.0.0 - 82.255.255.255
+      return 'UK';
+    }
+    
+    // Germany ranges
+    if ((ipNum >= 0x2E000000 && ipNum <= 0x2FFFFFFF)) { // 46.0.0.0 - 47.255.255.255
+      return 'DE';
+    }
+    
+    // France ranges
+    if ((ipNum >= 0x2D000000 && ipNum <= 0x2DFFFFFF)) { // 45.0.0.0 - 45.255.255.255
+      return 'FR';
+    }
+    
+    // Singapore ranges
+    if ((ipNum >= 0x2B000000 && ipNum <= 0x2BFFFFFF)) { // 43.0.0.0 - 43.255.255.255
+      return 'SG';
+    }
+    
+    return null;
+  };
+
   // Helper function to get country flag and name
   const getCountryInfo = (countryCode: string) => {
     const countryMap: { [key: string]: { flag: string; name: string } } = {
@@ -944,7 +998,8 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                       const autoProxyRegion = (profile.proxy as any)?.autoProxyRegion;
                       const host = profile.proxy.host;
                       
-                      let countryInfo = { flag: '🌐', name: 'Custom Proxy' };
+                      let countryCode: string | null = null;
+                      let displayText = host || 'Custom Proxy';
                       
                       // Priority 1: customName (for geolocation proxies)
                       if (customName) {
@@ -962,41 +1017,46 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                         }).find(([name]) => name.toLowerCase() === trimmedName.toLowerCase());
                         
                         if (exactMatch) {
-                          countryInfo = getCountryInfo(exactMatch[1]);
-                        } else {
-                          countryInfo = { flag: '🌐', name: customName };
+                          countryCode = exactMatch[1];
                         }
                       }
                       // Priority 2: proxyRegion (from profile level)
                       else if (proxyRegion && proxyRegion !== '') {
-                        countryInfo = getCountryInfo(proxyRegion.toUpperCase());
+                        countryCode = proxyRegion.toUpperCase();
                       }
                       // Priority 3: autoProxyRegion (from proxy object)
                       else if (autoProxyRegion && autoProxyRegion !== 'us') {
-                        countryInfo = getCountryInfo(autoProxyRegion.toUpperCase());
+                        countryCode = autoProxyRegion.toUpperCase();
                       }
-                      // Priority 4: host domain analysis
+                      // Priority 4: Detect from IP address
                       else if (host && host !== '') {
-                        const lowerHost = host.toLowerCase();
-                        if (lowerHost.includes('.us') || lowerHost.includes('usa')) {
-                          countryInfo = getCountryInfo('US');
-                        } else if (lowerHost.includes('.uk') || lowerHost.includes('.gb')) {
-                          countryInfo = getCountryInfo('UK');
-                        } else if (lowerHost.includes('.de') || lowerHost.includes('germany')) {
-                          countryInfo = getCountryInfo('DE');
-                        } else if (lowerHost.includes('.fr') || lowerHost.includes('france')) {
-                          countryInfo = getCountryInfo('FR');
-                        } else if (lowerHost.includes('.vn') || lowerHost.includes('vietnam')) {
-                          countryInfo = getCountryInfo('VN');
+                        // Try IP-based detection first
+                        const detectedCountry = getCountryFromIP(host);
+                        if (detectedCountry) {
+                          countryCode = detectedCountry;
                         } else {
-                          countryInfo = { flag: '🌐', name: host };
+                          // Fallback to domain analysis
+                          const lowerHost = host.toLowerCase();
+                          if (lowerHost.includes('.us') || lowerHost.includes('usa')) {
+                            countryCode = 'US';
+                          } else if (lowerHost.includes('.uk') || lowerHost.includes('.gb')) {
+                            countryCode = 'UK';
+                          } else if (lowerHost.includes('.de') || lowerHost.includes('germany')) {
+                            countryCode = 'DE';
+                          } else if (lowerHost.includes('.fr') || lowerHost.includes('france')) {
+                            countryCode = 'FR';
+                          } else if (lowerHost.includes('.vn') || lowerHost.includes('vietnam')) {
+                            countryCode = 'VN';
+                          }
                         }
                       }
+                      
+                      const countryInfo = countryCode ? getCountryInfo(countryCode) : { flag: '🌐', name: '' };
                       
                       return (
                         <>
                           <span className="text-sm">{countryInfo.flag}</span>
-                          <span className="text-xs text-gray-600">{countryInfo.name}</span>
+                          <span className="text-xs text-gray-600">{displayText}</span>
                         </>
                       );
                     })()}

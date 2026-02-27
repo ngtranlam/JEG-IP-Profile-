@@ -55,11 +55,20 @@ class GoLoginAPI {
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
         if ($response === false) {
-            throw new Exception("cURL error: " . curl_error($ch));
+            throw new Exception("cURL error: " . $curlError);
         }
+
+        // Log request and response for debugging
+        error_log("GoLogin API Request: $method $url");
+        if ($data) {
+            error_log("GoLogin API Request Data: " . json_encode($data));
+        }
+        error_log("GoLogin API Response Code: $httpCode");
+        error_log("GoLogin API Response: " . $response);
 
         $decodedResponse = json_decode($response, true);
         
