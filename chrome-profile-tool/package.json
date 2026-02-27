@@ -98,7 +98,11 @@
       "package.json"
     ],
     "extraResources": [
-      ".env"
+      {
+        "from": ".env",
+        "to": ".env",
+        "filter": ["**/*"]
+      }
     ],
     "asarUnpack": [
       "node_modules/gologin/**/*",
@@ -154,7 +158,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "JEG Profile Manager"
+      "shortcutName": "JEG Profile Manager",
+      "include": "installer.nsh"
     },
     "dmg": {
       "contents": [
