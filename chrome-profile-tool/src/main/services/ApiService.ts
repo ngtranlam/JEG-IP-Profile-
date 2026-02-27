@@ -190,6 +190,29 @@ export class ApiService {
     return response.data;
   }
 
+  async gologinGetCookies(profileId: string): Promise<any> {
+    const response = await this.makeRequest(`/gologin/${profileId}/cookies`, {
+      method: 'GET',
+    });
+    return response.data;
+  }
+
+  async gologinImportCookies(profileId: string, cookies: any[]): Promise<any> {
+    const response = await this.makeRequest(`/gologin/${profileId}/cookies`, {
+      method: 'POST',
+      body: JSON.stringify(cookies),
+    });
+    return response.data;
+  }
+
+  async gologinRemoveCookies(profileId: string): Promise<any> {
+    const response = await this.makeRequest(`/gologin/${profileId}/cookies?cleanCookies=true`, {
+      method: 'POST',
+      body: JSON.stringify([]),
+    });
+    return response.data;
+  }
+
   async gologinDeleteProfile(profileId: string): Promise<void> {
     await this.makeRequest(`/gologin/${profileId}`, {
       method: 'DELETE',

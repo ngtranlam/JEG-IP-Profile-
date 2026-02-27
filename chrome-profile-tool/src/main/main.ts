@@ -226,6 +226,18 @@ class ChromeProfileTool {
       return await this.apiService.gologinTestConnection();
     });
 
+    ipcMain.handle('gologin:get-cookies', async (_, profileId) => {
+      return await this.apiService.gologinGetCookies(profileId);
+    });
+
+    ipcMain.handle('gologin:import-cookies', async (_, profileId, cookies) => {
+      return await this.apiService.gologinImportCookies(profileId, cookies);
+    });
+
+    ipcMain.handle('gologin:remove-cookies', async (_, profileId) => {
+      return await this.apiService.gologinRemoveCookies(profileId);
+    });
+
     // Local Data IPC handlers (from database)
     ipcMain.handle('local-data:get-folders', async () => {
       const token = this.authService.getCurrentToken();

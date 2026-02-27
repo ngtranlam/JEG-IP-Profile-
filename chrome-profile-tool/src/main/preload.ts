@@ -43,6 +43,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('proxy:test-config', config),
 
   // GoLogin API methods
+  gologinGetCookies: (profileId: string) =>
+    ipcRenderer.invoke('gologin:get-cookies', profileId),
+  
+  gologinImportCookies: (profileId: string, cookies: any[]) =>
+    ipcRenderer.invoke('gologin:import-cookies', profileId, cookies),
+  
+  gologinRemoveCookies: (profileId: string) =>
+    ipcRenderer.invoke('gologin:remove-cookies', profileId),
+
+  // GoLogin API methods (existing)
   gologinListProfiles: (page?: number, search?: string, folder?: string) => 
     ipcRenderer.invoke('gologin:list-profiles', page, search, folder),
   
@@ -278,6 +288,9 @@ declare global {
       }>;
       
       // GoLogin API methods
+      gologinGetCookies: (profileId: string) => Promise<any>;
+      gologinImportCookies: (profileId: string, cookies: any[]) => Promise<any>;
+      gologinRemoveCookies: (profileId: string) => Promise<any>;
       gologinListProfiles: (page?: number, search?: string, folder?: string) => Promise<any>;
       gologinGetProfile: (profileId: string) => Promise<any>;
       gologinCreateProfile: (profileData: any) => Promise<any>;
