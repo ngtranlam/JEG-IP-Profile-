@@ -1,9 +1,9 @@
 ; NSIS Installer Script - Copy .env file to resources folder
 
 !macro customInstall
-  ; Copy .env file from installer to resources folder
+  ; Copy .env file from project directory to resources folder
   SetOutPath "$INSTDIR\resources"
-  File "${BUILD_RESOURCES_DIR}\..\..\.env"
+  File /nonfatal "${PROJECT_DIR}\.env"
 !macroend
 
 !macro customUnInstall
