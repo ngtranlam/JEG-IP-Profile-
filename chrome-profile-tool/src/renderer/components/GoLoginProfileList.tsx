@@ -321,6 +321,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
         updatedAt: profile.updated_at || new Date().toISOString(),
         browserType: profile.browser_type || 'chrome',
         canBeRunning: profile.can_be_running !== 0,
+        folder_name: profile.folder_name || null,
       }));
       
       console.log('Transformed profiles:', transformedProfiles);
@@ -917,7 +918,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
           <div className="min-w-full">
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-xs font-medium text-gray-700 uppercase tracking-wider">
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="col-span-2 flex items-center gap-2">
                 <span>Name</span>
                 <div className="flex flex-col">
                   <button className="text-gray-400 hover:text-gray-600">↑</button>
@@ -926,17 +927,24 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                 <Plus className="w-3 h-3 text-gray-400" />
               </div>
               <div className="col-span-2">State</div>
-              <div className="col-span-3">Notes</div>
+              <div className="col-span-2">Seller</div>
+              <div className="col-span-2">Notes</div>
               <div className="col-span-3">Location</div>
               <div className="col-span-1"></div>
             </div>
 
             {/* Table Body */}
             <div className="divide-y divide-gray-100">
-              {profiles.map((profile) => (
+              {profiles.map((profile) => {
+                // Debug: log first profile to check folder_name
+                if (profiles.indexOf(profile) === 0) {
+                  console.log('Profile data:', profile);
+                  console.log('folder_name:', (profile as any).folder_name);
+                }
+                return (
                 <div key={profile.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
                   {/* Name */}
-                  <div className="col-span-3 flex items-center gap-2">
+                  <div className="col-span-2 flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900 truncate">
                       {profile.name}
                     </span>
@@ -1000,8 +1008,15 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                     })()}
                   </div>
 
+                  {/* Seller */}
+                  <div className="col-span-2 flex items-center">
+                    <span className="text-xs text-gray-600 truncate">
+                      {(profile as any).folder_name || '-'}
+                    </span>
+                  </div>
+
                   {/* Notes */}
-                  <div className="col-span-3 flex items-center">
+                  <div className="col-span-2 flex items-center">
                     {editingNoteId === profile.id ? (
                       <input
                         type="text"
@@ -1128,7 +1143,8 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

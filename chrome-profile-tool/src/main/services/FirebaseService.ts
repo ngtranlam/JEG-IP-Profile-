@@ -70,9 +70,19 @@ export class FirebaseService {
         };
       }
       
+      // Custom error messages for better UX
+      let errorMessage = error.message || 'Sign in failed';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please check and try again.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'User not found. Please check your username.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      }
+      
       return {
         success: false,
-        error: error.message || 'Sign in failed'
+        error: errorMessage
       };
     }
   }
@@ -92,9 +102,18 @@ export class FirebaseService {
         user: userCredential.user
       };
     } catch (error: any) {
+      let errorMessage = error.message;
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please check and try again.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'User not found. Please check your username.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      }
+      
       return {
         success: false,
-        error: error.message || 'User creation failed'
+        error: errorMessage
       };
     }
   }
