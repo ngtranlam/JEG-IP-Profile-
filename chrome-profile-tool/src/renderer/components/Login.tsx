@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import iegLogo from '../assets/Layer2.png';
 import backgroundImage from '../assets/jeg-scaled.jpg';
@@ -13,11 +13,31 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState('');
   const [sendingReset, setSendingReset] = useState(false);
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedCreds = await window.electronAPI.auth.getSavedCredentials();
+        if (savedCreds) {
+          setUserName(savedCreds.userName);
+          setPassword(savedCreds.password);
+          setRememberMe(true);
+          console.log('Loaded saved credentials for:', savedCreds.userName);
+        }
+      } catch (error) {
+        console.error('Failed to load saved credentials:', error);
+      }
+    };
+    
+    loadSavedCredentials();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +48,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const result = await window.electronAPI.auth.login(userName, password);
       
       if (result.success) {
+        // Save credentials if remember me is checked
+        if (rememberMe) {
+          await window.electronAPI.auth.saveCredentials(userName, password);
+        } else {
+          await window.electronAPI.auth.clearSavedCredentials();
+        }
         onLoginSuccess(result);
       } else if (result.requirePasswordChange || result.require2FA) {
         // Handle password change or 2FA requirement
@@ -121,6 +147,19 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 )}
               </button>
             </div>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="rememberMe"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+            />
+            <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-700">
+              Remember me for 60 days
+            </label>
           </div>
 
           <button

@@ -730,6 +730,70 @@ class ChromeProfileTool {
       }
     });
 
+    // Saved credentials handlers
+    ipcMain.handle('auth:save-credentials', async (_, userName, password) => {
+      try {
+        const credentialsPath = path.join(app.getPath('userData'), 'saved-credentials.json');
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 60); // 60 days from now
+        
+        const credentials = {
+          userName,
+          password: Buffer.from(password).toString('base64'), // Simple encoding
+          expiresAt: expiresAt.toISOString()
+        };
+        
+        fs.writeFileSync(credentialsPath, JSON.stringify(credentials), 'utf-8');
+        console.log('Credentials saved for 60 days');
+        return { success: true };
+      } catch (error: any) {
+        console.error('Failed to save credentials:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('auth:clear-saved-credentials', async () => {
+      try {
+        const credentialsPath = path.join(app.getPath('userData'), 'saved-credentials.json');
+        if (fs.existsSync(credentialsPath)) {
+          fs.unlinkSync(credentialsPath);
+          console.log('Saved credentials cleared');
+        }
+        return { success: true };
+      } catch (error: any) {
+        console.error('Failed to clear credentials:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('auth:get-saved-credentials', async () => {
+      try {
+        const credentialsPath = path.join(app.getPath('userData'), 'saved-credentials.json');
+        if (!fs.existsSync(credentialsPath)) {
+          return null;
+        }
+        
+        const data = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+        const expiresAt = new Date(data.expiresAt);
+        
+        // Check if credentials expired
+        if (expiresAt < new Date()) {
+          console.log('Saved credentials expired, removing...');
+          fs.unlinkSync(credentialsPath);
+          return null;
+        }
+        
+        return {
+          userName: data.userName,
+          password: Buffer.from(data.password, 'base64').toString('utf-8'),
+          expiresAt: data.expiresAt
+        };
+      } catch (error: any) {
+        console.error('Failed to get saved credentials:', error);
+        return null;
+      }
+    });
+
     // Auto-sync IPC handlers
     ipcMain.handle('auto-sync:start', async () => {
       this.autoSyncService.start();

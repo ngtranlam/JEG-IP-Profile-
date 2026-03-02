@@ -262,6 +262,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     is2FAEnabled: () =>
       ipcRenderer.invoke('auth:is2FAEnabled'),
+    
+    saveCredentials: (userName: string, password: string) =>
+      ipcRenderer.invoke('auth:save-credentials', userName, password),
+    
+    clearSavedCredentials: () =>
+      ipcRenderer.invoke('auth:clear-saved-credentials'),
+    
+    getSavedCredentials: () =>
+      ipcRenderer.invoke('auth:get-saved-credentials'),
   },
 });
 
