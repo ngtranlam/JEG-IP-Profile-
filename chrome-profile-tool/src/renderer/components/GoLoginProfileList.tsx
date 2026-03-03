@@ -897,6 +897,18 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     }
   };
 
+  // Helper function to strip HTML tags and decode entities from notes
+  const stripHtmlTags = (html: string): string => {
+    if (!html) return '';
+    
+    // Create a temporary div to decode HTML entities
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Get text content (strips all HTML tags)
+    return temp.textContent || temp.innerText || '';
+  };
+
   const ConnectionStatus = () => (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
       connectionStatus === true ? 'bg-green-100 text-green-800' :
@@ -1157,7 +1169,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                         className="text-xs text-blue-600 truncate cursor-pointer hover:bg-blue-50 px-2 py-1 rounded w-full"
                         title="Double-click to edit"
                       >
-                        {profile.notes || 'select text for formatting...'}
+                        {stripHtmlTags(profile.notes || '') || 'select text for formatting...'}
                       </span>
                     )}
                   </div>
