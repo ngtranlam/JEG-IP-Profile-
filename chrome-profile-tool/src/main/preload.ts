@@ -152,6 +152,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   localDataDeleteFolder: (folderId: string) => 
     ipcRenderer.invoke('local-data:delete-folder', folderId),
 
+  // Profile-Folder management methods
+  localDataAssignProfileFolders: (profileId: string, folderIds: string[]) =>
+    ipcRenderer.invoke('local-data:assign-profile-folders', profileId, folderIds),
+  
+  localDataRemoveProfileFolders: (profileId: string, folderIds: string[]) =>
+    ipcRenderer.invoke('local-data:remove-profile-folders', profileId, folderIds),
+  
+  localDataSetProfileFolders: (profileId: string, folderIds: string[]) =>
+    ipcRenderer.invoke('local-data:set-profile-folders', profileId, folderIds),
+  
+  localDataGetProfileFolders: (profileId: string) =>
+    ipcRenderer.invoke('local-data:get-profile-folders', profileId),
+
   // User management methods
   localDataGetUsers: () => 
     ipcRenderer.invoke('local-data:get-users'),
@@ -338,6 +351,12 @@ declare global {
       localDataCreateFolder: (name: string, sellerId?: number) => Promise<any>;
       localDataUpdateFolder: (folderId: string, name: string) => Promise<void>;
       localDataDeleteFolder: (folderId: string) => Promise<void>;
+      
+      // Profile-Folder management methods
+      localDataAssignProfileFolders: (profileId: string, folderIds: string[]) => Promise<void>;
+      localDataRemoveProfileFolders: (profileId: string, folderIds: string[]) => Promise<void>;
+      localDataSetProfileFolders: (profileId: string, folderIds: string[]) => Promise<void>;
+      localDataGetProfileFolders: (profileId: string) => Promise<any[]>;
       
       // User management methods
       localDataGetUsers: () => Promise<any[]>;

@@ -493,6 +493,48 @@ export class ApiService {
     });
   }
 
+  // Profile-Folder management methods
+  async assignProfileToFolders(token: string, profileId: string, folderIds: string[]): Promise<void> {
+    await this.makeRequest('/local_data/assign_profile_folders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId, folderIds }),
+    });
+  }
+
+  async removeProfileFromFolders(token: string, profileId: string, folderIds: string[]): Promise<void> {
+    await this.makeRequest('/local_data/remove_profile_folders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId, folderIds }),
+    });
+  }
+
+  async setProfileFolders(token: string, profileId: string, folderIds: string[]): Promise<void> {
+    await this.makeRequest('/local_data/set_profile_folders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId, folderIds }),
+    });
+  }
+
+  async getProfileFolders(token: string, profileId: string): Promise<any[]> {
+    const response = await this.makeRequest('/local_data/get_profile_folders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ profileId }),
+    });
+    return response.data;
+  }
+
   // User management methods
   async getUsers(token: string): Promise<any[]> {
     const response = await this.makeRequest('/local_data/users', {

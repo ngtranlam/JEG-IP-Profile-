@@ -349,6 +349,31 @@ class ChromeProfileTool {
       return await this.apiService.deleteFolder(token, folderId);
     });
 
+    // Profile-Folder management IPC handlers
+    ipcMain.handle('local-data:assign-profile-folders', async (_, profileId, folderIds) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.assignProfileToFolders(token, profileId, folderIds);
+    });
+
+    ipcMain.handle('local-data:remove-profile-folders', async (_, profileId, folderIds) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.removeProfileFromFolders(token, profileId, folderIds);
+    });
+
+    ipcMain.handle('local-data:set-profile-folders', async (_, profileId, folderIds) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.setProfileFolders(token, profileId, folderIds);
+    });
+
+    ipcMain.handle('local-data:get-profile-folders', async (_, profileId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getProfileFolders(token, profileId);
+    });
+
     // User management IPC handlers
     ipcMain.handle('local-data:get-users', async () => {
       const token = this.authService.getCurrentToken();

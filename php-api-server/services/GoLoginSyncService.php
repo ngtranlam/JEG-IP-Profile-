@@ -217,7 +217,10 @@ class GoLoginSyncService {
         // GoLogin API returns 'folders' as an array of folder names
         // We need to lookup the folder_id from database using the folder name
         $folderId = null;
+        $allFolderIds = [];
+        
         if (isset($profile['folders']) && is_array($profile['folders']) && count($profile['folders']) > 0) {
+            // Get primary folder (first one) for backward compatibility
             $folderName = $profile['folders'][0];
             
             // Lookup folder_id from database by name
@@ -233,9 +236,20 @@ class GoLoginSyncService {
             } else {
                 error_log("Warning: Folder '$folderName' not found in database for profile $profileId");
             }
+            
+            // Get ALL folder IDs for junction table sync
+            foreach ($profile['folders'] as $folderName) {
+                $folderStmt->bindParam(':name', $folderName);
+                $folderStmt->execute();
+                $folderResult = $folderStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($folderResult) {
+                    $allFolderIds[] = $folderResult['folder_id'];
+                }
+            }
         }
         
-        error_log("Syncing profile: $profileId - $name, folder_id: " . ($folderId ?? 'null'));
+        error_log("Syncing profile: $profileId - $name, folder_id: " . ($folderId ?? 'null') . ", total folders: " . count($allFolderIds));
         
         $browserType = $profile['browserType'] ?? null;
         $os = $profile['os'] ?? null;
@@ -284,7 +298,41 @@ class GoLoginSyncService {
         $stmt->bindParam(':created_at', $createdAt);
         $stmt->bindParam(':updated_at', $updatedAt);
         
-        return $stmt->execute();
+        $stmt->execute();
+        
+        error_log("Profile synced: $profileId");
+        
+        // Sync profile-folder relationships to junction table
+        if (!empty($allFolderIds)) {
+            $this->syncProfileFolders($profileId, $allFolderIds);
+        }
+    }
+    
+    /**
+     * Sync profile folders to junction table
+     */
+    private function syncProfileFolders($profileId, $folderIds) {
+        try {
+            // First, remove all existing folder associations for this profile
+            $deleteSql = "DELETE FROM gologin_profile_folders WHERE profile_id = :profile_id";
+            $deleteStmt = $this->conn->prepare($deleteSql);
+            $deleteStmt->bindParam(':profile_id', $profileId);
+            $deleteStmt->execute();
+            
+            // Then, insert new folder associations
+            $insertSql = "INSERT IGNORE INTO gologin_profile_folders (profile_id, folder_id) VALUES (:profile_id, :folder_id)";
+            $insertStmt = $this->conn->prepare($insertSql);
+            
+            foreach ($folderIds as $folderId) {
+                $insertStmt->bindParam(':profile_id', $profileId);
+                $insertStmt->bindParam(':folder_id', $folderId);
+                $insertStmt->execute();
+            }
+            
+            error_log("Synced " . count($folderIds) . " folder(s) for profile $profileId to junction table");
+        } catch (Exception $e) {
+            error_log("Error syncing profile folders to junction table: " . $e->getMessage());
+        }
     }
 
     /**
@@ -299,29 +347,6 @@ class GoLoginSyncService {
         $stmt->execute();
         
         return $this->conn->lastInsertId();
-    }
-
-    /**
-     * Complete sync log entry
-     */
-    private function completeSyncLog($logId, $status, $foldersCount = 0, $profilesCount = 0, $errors = null) {
-        $sql = "UPDATE gologin_sync_log 
-                SET status = :status,
-                    folders_synced = :folders_synced,
-                    profiles_synced = :profiles_synced,
-                    errors = :errors,
-                    completed_at = NOW(),
-                    duration_seconds = TIMESTAMPDIFF(SECOND, started_at, NOW())
-                WHERE id = :log_id";
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bindParam(':status', $status);
-        $stmt->bindParam(':folders_synced', $foldersCount);
-        $stmt->bindParam(':profiles_synced', $profilesCount);
-        $stmt->bindParam(':errors', $errors);
-        $stmt->bindParam(':log_id', $logId);
-        
-        return $stmt->execute();
     }
 
     /**

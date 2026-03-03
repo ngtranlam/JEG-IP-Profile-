@@ -39,7 +39,21 @@ try {
     
     switch ($method) {
         case 'GET':
-            if ($action === 'folders') {
+            if ($action === 'cookies') {
+                // Get profile cookies
+                if (!$profileId) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Profile ID is required']);
+                    exit();
+                }
+                try {
+                    $cookies = $gologinAPI->getProfileCookies($profileId);
+                    echo json_encode(['success' => true, 'data' => $cookies]);
+                } catch (Exception $e) {
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+            } elseif ($action === 'folders') {
                 // List folders
                 try {
                     $folders = $gologinAPI->listFolders();
@@ -121,6 +135,28 @@ try {
                     case 'remove-proxy':
                         $result = $gologinAPI->removeProfileProxy($profileId);
                         echo json_encode(['success' => true, 'data' => $result]);
+                        break;
+                        
+                    case 'cookies':
+                        $input = json_decode(file_get_contents('php://input'), true);
+                        
+                        // Check if this is a remove cookies request
+                        $cleanCookies = isset($_GET['cleanCookies']) && $_GET['cleanCookies'] === 'true';
+                        
+                        if ($cleanCookies) {
+                            // Remove cookies - body must be empty array
+                            $result = $gologinAPI->removeProfileCookies($profileId);
+                            echo json_encode(['success' => true, 'message' => 'Cookies removed successfully']);
+                        } else {
+                            // Import cookies
+                            if (!$input || !is_array($input)) {
+                                http_response_code(400);
+                                echo json_encode(['error' => 'Cookies array is required']);
+                                exit();
+                            }
+                            $result = $gologinAPI->importProfileCookies($profileId, $input);
+                            echo json_encode(['success' => true, 'data' => $result]);
+                        }
                         break;
                         
                     default:

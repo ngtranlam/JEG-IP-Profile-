@@ -18,7 +18,7 @@ class GoLoginDataService {
         if ($userRole === '1') {
             $sql = "SELECT f.folder_id, f.name, f.seller_id, f.created_at, f.updated_at, f.synced_at,
                     u.userName as seller_name,
-                    (SELECT COUNT(*) FROM gologin_profiles WHERE folder_id = f.folder_id) as profilesCount
+                    (SELECT COUNT(*) FROM gologin_profile_folders WHERE folder_id = f.folder_id) as profilesCount
                     FROM gologin_folders f
                     LEFT JOIN users u ON f.seller_id = u.id
                     ORDER BY f.created_at DESC";
@@ -29,7 +29,7 @@ class GoLoginDataService {
             // Seller can only see folders assigned to them
             $sql = "SELECT f.folder_id, f.name, f.seller_id, f.created_at, f.updated_at, f.synced_at,
                     u.userName as seller_name,
-                    (SELECT COUNT(*) FROM gologin_profiles WHERE folder_id = f.folder_id) as profilesCount
+                    (SELECT COUNT(*) FROM gologin_profile_folders WHERE folder_id = f.folder_id) as profilesCount
                     FROM gologin_folders f
                     LEFT JOIN users u ON f.seller_id = u.id
                     WHERE f.seller_id = :user_id
@@ -48,7 +48,7 @@ class GoLoginDataService {
      */
     public function getFolderById($folderId) {
         $sql = "SELECT folder_id, name, created_at, updated_at, synced_at,
-                (SELECT COUNT(*) FROM gologin_profiles WHERE folder_id = gologin_folders.folder_id) as profilesCount
+                (SELECT COUNT(*) FROM gologin_profile_folders WHERE folder_id = gologin_folders.folder_id) as profilesCount
                 FROM gologin_folders
                 WHERE folder_id = :folder_id";
         
@@ -78,21 +78,27 @@ class GoLoginDataService {
         }
         
         if ($folderId) {
-            $whereConditions[] = "p.folder_id = :folder_id";
+            $whereConditions[] = "EXISTS (
+                SELECT 1 FROM gologin_profile_folders pf
+                WHERE pf.profile_id = p.profile_id
+                AND pf.folder_id = :folder_id
+            )";
             $params[':folder_id'] = $folderId;
-            error_log("Adding folder filter: p.folder_id = '$folderId'");
+            error_log("Adding folder filter using junction table: folder_id = '$folderId'");
         }
         
         // Role-based filtering
         if ($userRole === '3' && $userId) {
             // Seller can only see profiles in folders assigned to them
+            // Use junction table to support many-to-many relationship
             $whereConditions[] = "EXISTS (
-                SELECT 1 FROM gologin_folders f
-                WHERE f.folder_id = p.folder_id
+                SELECT 1 FROM gologin_profile_folders pf
+                INNER JOIN gologin_folders f ON pf.folder_id = f.folder_id
+                WHERE pf.profile_id = p.profile_id
                 AND f.seller_id = :user_id
             )";
             $params[':user_id'] = $userId;
-            error_log("Adding seller filter: seller_id = $userId");
+            error_log("Adding seller filter using junction table: seller_id = $userId");
         }
         
         $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
@@ -111,11 +117,14 @@ class GoLoginDataService {
         
         error_log("Total profiles found: $total");
         
-        // Get profiles
-        $sql = "SELECT p.*, f.name as folder_name
+        // Get profiles with all folder names
+        $sql = "SELECT p.*, 
+                GROUP_CONCAT(DISTINCT f.name ORDER BY f.name SEPARATOR ', ') as folder_names
                 FROM gologin_profiles p
-                LEFT JOIN gologin_folders f ON p.folder_id = f.folder_id
+                LEFT JOIN gologin_profile_folders pf ON p.profile_id = pf.profile_id
+                LEFT JOIN gologin_folders f ON pf.folder_id = f.folder_id
                 {$whereClause}
+                GROUP BY p.profile_id
                 ORDER BY p.last_activity DESC, p.name ASC
                 LIMIT :limit OFFSET :offset";
         
@@ -165,9 +174,10 @@ class GoLoginDataService {
      * Get profiles by folder ID
      */
     public function getProfilesByFolder($folderId) {
-        $sql = "SELECT * FROM gologin_profiles
-                WHERE folder_id = :folder_id
-                ORDER BY name ASC";
+        $sql = "SELECT p.* FROM gologin_profiles p
+                INNER JOIN gologin_profile_folders pf ON p.profile_id = pf.profile_id
+                WHERE pf.folder_id = :folder_id
+                ORDER BY p.name ASC";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':folder_id', $folderId);
@@ -437,6 +447,88 @@ class GoLoginDataService {
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':folder_id', $folderId);
         return $stmt->execute();
+    }
+
+    /**
+     * Get folders for a specific profile
+     */
+    public function getProfileFolders($profileId) {
+        $sql = "SELECT f.folder_id, f.name
+                FROM gologin_folders f
+                INNER JOIN gologin_profile_folders pf ON f.folder_id = pf.folder_id
+                WHERE pf.profile_id = :profile_id
+                ORDER BY f.name ASC";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':profile_id', $profileId);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Add profile to folders (many-to-many)
+     */
+    public function addProfileToFolders($profileId, $folderIds) {
+        if (!is_array($folderIds)) {
+            $folderIds = [$folderIds];
+        }
+
+        $sql = "INSERT IGNORE INTO gologin_profile_folders (profile_id, folder_id) VALUES (:profile_id, :folder_id)";
+        $stmt = $this->conn->prepare($sql);
+
+        foreach ($folderIds as $folderId) {
+            $stmt->bindParam(':profile_id', $profileId);
+            $stmt->bindParam(':folder_id', $folderId);
+            $stmt->execute();
+        }
+
+        return true;
+    }
+
+    /**
+     * Remove profile from folders
+     */
+    public function removeProfileFromFolders($profileId, $folderIds) {
+        if (!is_array($folderIds)) {
+            $folderIds = [$folderIds];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($folderIds), '?'));
+        $sql = "DELETE FROM gologin_profile_folders WHERE profile_id = ? AND folder_id IN ($placeholders)";
+        
+        $stmt = $this->conn->prepare($sql);
+        $params = array_merge([$profileId], $folderIds);
+        $stmt->execute($params);
+
+        return true;
+    }
+
+    /**
+     * Set profile folders (replace all existing)
+     */
+    public function setProfileFolders($profileId, $folderIds) {
+        // Start transaction
+        $this->conn->beginTransaction();
+
+        try {
+            // Remove all existing folder associations
+            $sql = "DELETE FROM gologin_profile_folders WHERE profile_id = :profile_id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':profile_id', $profileId);
+            $stmt->execute();
+
+            // Add new folder associations
+            if (!empty($folderIds)) {
+                $this->addProfileToFolders($profileId, $folderIds);
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            throw $e;
+        }
     }
 
     /**

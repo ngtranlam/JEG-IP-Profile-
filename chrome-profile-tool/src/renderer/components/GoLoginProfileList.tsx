@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Play, Trash2, Settings, Folder, Tag, Globe, X, Upload } from 'lucide-react';
+import { Plus, Search, Play, Trash2, Settings, Folder, Tag, Globe, X, Upload, FolderOpen, Check, Edit } from 'lucide-react';
 
 interface GoLoginProfile {
   id: string;
@@ -71,6 +71,17 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
   const [isDragging, setIsDragging] = useState(false);
   const [cookies, setCookies] = useState<any[]>([]);
   const [loadingCookies, setLoadingCookies] = useState(false);
+  const [showFolderManager, setShowFolderManager] = useState(false);
+  const [selectedProfileForFolders, setSelectedProfileForFolders] = useState<string | null>(null);
+  const [profileFolders, setProfileFolders] = useState<string[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [showEditProxy, setShowEditProxy] = useState(false);
+  const [selectedProfileForProxy, setSelectedProfileForProxy] = useState<string | null>(null);
+  const [proxyMode, setProxyMode] = useState('http');
+  const [proxyHost, setProxyHost] = useState('');
+  const [proxyPort, setProxyPort] = useState('');
+  const [proxyUsername, setProxyUsername] = useState('');
+  const [proxyPassword, setProxyPassword] = useState('');
 
   // Listen for browser closed events
   useEffect(() => {
@@ -321,7 +332,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
         updatedAt: profile.updated_at || new Date().toISOString(),
         browserType: profile.browser_type || 'chrome',
         canBeRunning: profile.can_be_running !== 0,
-        folder_name: profile.folder_name || null,
+        folder_names: profile.folder_names || null,
       }));
       
       console.log('Transformed profiles:', transformedProfiles);
@@ -366,7 +377,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
     }
   };
 
-  const handlePasteProxy = async () => {
+  const handlePasteProxyForCreate = async () => {
     try {
       // Read from clipboard
       const clipboardText = await navigator.clipboard.readText();
@@ -635,6 +646,119 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
       setCookies([]);
     } finally {
       setLoadingCookies(false);
+    }
+  };
+
+  const fetchProfileFolders = async (profileId: string) => {
+    setLoadingFolders(true);
+    try {
+      const result = await window.electronAPI.localDataGetProfileFolders(profileId);
+      const folderIds = result.map((f: any) => f.folder_id);
+      setProfileFolders(folderIds);
+    } catch (error: any) {
+      console.error('Failed to fetch profile folders:', error);
+      setProfileFolders([]);
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
+
+  const handleOpenFolderManager = async (profileId: string) => {
+    setSelectedProfileForFolders(profileId);
+    setShowFolderManager(true);
+    await fetchProfileFolders(profileId);
+  };
+
+  const handleSaveProfileFolders = async () => {
+    if (!selectedProfileForFolders) return;
+
+    try {
+      await window.electronAPI.localDataSetProfileFolders(selectedProfileForFolders, profileFolders);
+      alert('Profile folders updated successfully!');
+      setShowFolderManager(false);
+      await loadProfiles();
+    } catch (error: any) {
+      console.error('Failed to update profile folders:', error);
+      alert('Failed to update profile folders. Please try again.');
+    }
+  };
+
+  const toggleFolderSelection = (folderId: string) => {
+    setProfileFolders(prev => {
+      if (prev.includes(folderId)) {
+        return prev.filter(id => id !== folderId);
+      } else {
+        return [...prev, folderId];
+      }
+    });
+  };
+
+  const handleOpenEditProxy = (profile: GoLoginProfile) => {
+    setSelectedProfileForProxy(profile.id);
+    setProxyMode(profile.proxy?.mode || 'http');
+    setProxyHost(profile.proxy?.host || '');
+    setProxyPort(profile.proxy?.port?.toString() || '');
+    setProxyUsername((profile.proxy as any)?.username || '');
+    setProxyPassword((profile.proxy as any)?.password || '');
+    setShowEditProxy(true);
+  };
+
+  const handlePasteProxy = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const input = text.trim();
+      
+      // Format 1: protocol://[username:password@]host:port
+      const urlRegex = /^(https?|socks4|socks5):\/\/(?:([^:@]+):([^@]+)@)?([^:]+):(\d+)$/;
+      const urlMatch = input.match(urlRegex);
+      
+      if (urlMatch) {
+        const [, mode, username, password, host, port] = urlMatch;
+        setProxyMode(mode);
+        setProxyHost(host);
+        setProxyPort(port);
+        setProxyUsername(username || '');
+        setProxyPassword(password || '');
+        return;
+      }
+      
+      // Format 2: ip:port:username:password or host:port:username:password
+      const colonFormat = input.split(':');
+      if (colonFormat.length >= 2) {
+        setProxyMode('http'); // Default to http
+        setProxyHost(colonFormat[0]);
+        setProxyPort(colonFormat[1]);
+        setProxyUsername(colonFormat[2] || '');
+        setProxyPassword(colonFormat[3] || '');
+        return;
+      }
+      
+      alert('Invalid proxy format. Supported formats:\n- protocol://[username:password@]host:port\n- ip:port:username:password');
+    } catch (error) {
+      console.error('Failed to paste proxy:', error);
+      alert('Failed to paste from clipboard');
+    }
+  };
+
+  const handleSaveProxy = async () => {
+    if (!selectedProfileForProxy) return;
+
+    try {
+      const proxyData = {
+        mode: proxyMode,
+        host: proxyHost,
+        port: parseInt(proxyPort),
+        username: proxyUsername,
+        password: proxyPassword,
+      };
+
+      await window.electronAPI.localDataSetProxy(selectedProfileForProxy, proxyData);
+      alert('Proxy updated successfully!');
+      setShowEditProxy(false);
+      await loadProfiles();
+    } catch (error: any) {
+      console.error('Failed to update proxy:', error);
+      alert('Failed to update proxy: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -936,10 +1060,10 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
             {/* Table Body */}
             <div className="divide-y divide-gray-100">
               {profiles.map((profile) => {
-                // Debug: log first profile to check folder_name
+                // Debug: log first profile to check folder_names
                 if (profiles.indexOf(profile) === 0) {
                   console.log('Profile data:', profile);
-                  console.log('folder_name:', (profile as any).folder_name);
+                  console.log('folder_names:', (profile as any).folder_names);
                 }
                 return (
                 <div key={profile.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
@@ -1009,9 +1133,9 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                   </div>
 
                   {/* Seller */}
-                  <div className="col-span-2 flex items-center">
-                    <span className="text-xs text-gray-600 truncate">
-                      {(profile as any).folder_name || '-'}
+                  <div className="col-span-2 flex items-center overflow-hidden">
+                    <span className="text-xs text-gray-600 truncate" title={(profile as any).folder_names || '-'}>
+                      {(profile as any).folder_names || '-'}
                     </span>
                   </div>
 
@@ -1116,6 +1240,13 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                         <>
                           <span className="text-sm">{countryInfo.flag}</span>
                           <span className="text-xs text-gray-600">{displayText}</span>
+                          <button
+                            onClick={() => handleOpenEditProxy(profile)}
+                            className="text-gray-400 hover:text-blue-600 transition-colors ml-2"
+                            title="Edit Proxy"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
                         </>
                       );
                     })()}
@@ -1123,6 +1254,15 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
 
                   {/* Actions */}
                   <div className="col-span-1 flex items-center justify-end gap-2">
+                    {!isSeller && (
+                      <button
+                        onClick={() => handleOpenFolderManager(profile.id)}
+                        className="text-gray-400 hover:text-purple-600 transition-colors"
+                        title="Manage Folders"
+                      >
+                        <FolderOpen className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={async () => {
                         setSelectedProfileId(profile.id);
@@ -1288,7 +1428,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-medium">Add or edit proxy</h3>
                     <button
-                      onClick={handlePasteProxy}
+                      onClick={handlePasteProxyForCreate}
                       className="flex items-center gap-2 px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                       title="Paste proxy from clipboard"
                     >
@@ -1735,6 +1875,211 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
               >
                 Import
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Proxy Modal */}
+      {showEditProxy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Proxy</h2>
+              <button
+                onClick={() => {
+                  setShowEditProxy(false);
+                  setSelectedProfileForProxy(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-gray-600">Enter proxy details</p>
+                <button
+                  onClick={handlePasteProxy}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                  title="Paste proxy from clipboard"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Paste
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Protocol</label>
+                <select
+                  value={proxyMode}
+                  onChange={(e) => setProxyMode(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="http">HTTP</option>
+                  <option value="https">HTTPS</option>
+                  <option value="socks4">SOCKS4</option>
+                  <option value="socks5">SOCKS5</option>
+                  <option value="none">No Proxy</option>
+                </select>
+              </div>
+
+              {proxyMode !== 'none' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Host</label>
+                      <input
+                        type="text"
+                        value={proxyHost}
+                        onChange={(e) => setProxyHost(e.target.value)}
+                        placeholder="proxy.example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                      <input
+                        type="text"
+                        value={proxyPort}
+                        onChange={(e) => setProxyPort(e.target.value)}
+                        placeholder="8080"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={proxyUsername}
+                      onChange={(e) => setProxyUsername(e.target.value)}
+                      placeholder="username"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={proxyPassword}
+                      onChange={(e) => setProxyPassword(e.target.value)}
+                      placeholder="password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowEditProxy(false);
+                  setSelectedProfileForProxy(null);
+                }}
+                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProxy}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Folder Manager Modal */}
+      {showFolderManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Manage Profile Folders</h2>
+              <button
+                onClick={() => {
+                  setShowFolderManager(false);
+                  setSelectedProfileForFolders(null);
+                  setProfileFolders([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+              {loadingFolders ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {folders.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No folders available</p>
+                  ) : (
+                    folders.map((folder) => (
+                      <div
+                        key={folder.folder_id}
+                        className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => toggleFolderSelection(folder.folder_id)}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          profileFolders.includes(folder.folder_id)
+                            ? 'border-orange-500 bg-orange-500'
+                            : 'border-gray-300 bg-white'
+                        }`}>
+                          {profileFolders.includes(folder.folder_id) && (
+                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Folder className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900">{folder.name}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-400">
+                          {folder.profilesCount || 0} profiles
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center p-6 border-t bg-gray-50">
+              <p className="text-sm text-gray-600">
+                {profileFolders.length} folder{profileFolders.length !== 1 ? 's' : ''} selected
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowFolderManager(false);
+                    setSelectedProfileForFolders(null);
+                    setProfileFolders([]);
+                  }}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProfileFolders}
+                  disabled={loadingFolders}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>

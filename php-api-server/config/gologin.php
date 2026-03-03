@@ -32,19 +32,19 @@ class GoLoginAPI {
         switch ($method) {
             case 'POST':
                 curl_setopt($ch, CURLOPT_POST, true);
-                if ($data) {
+                if ($data !== null) {
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 }
                 break;
             case 'PUT':
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-                if ($data) {
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT'); 
+                if ($data !== null) {
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 }
                 break;
             case 'PATCH':
                 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
-                if ($data) {
+                if ($data !== null) {
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 }
                 break;
@@ -142,6 +142,11 @@ class GoLoginAPI {
         return $this->makeRequest('/browser/' . $profileId . '/proxy', 'PUT', $proxy);
     }
 
+    public function setProxy($profileId, $proxyData) {
+        // Use PATCH method as per GoLogin API documentation
+        return $this->makeRequest('/browser/' . $profileId . '/proxy', 'PATCH', $proxyData);
+    }
+
     public function removeProfileProxy($profileId) {
         return $this->makeRequest('/browser/' . $profileId . '/proxy', 'DELETE');
     }
@@ -217,6 +222,19 @@ class GoLoginAPI {
             'name' => $oldName,
             'newName' => $newName
         ]);
+    }
+
+    public function getProfileCookies($profileId) {
+        return $this->makeRequest('/browser/' . $profileId . '/cookies', 'GET');
+    }
+
+    public function importProfileCookies($profileId, $cookies) {
+        return $this->makeRequest('/browser/' . $profileId . '/cookies', 'POST', $cookies);
+    }
+
+    public function removeProfileCookies($profileId) {
+        // GoLogin API requires POST with cleanCookies=true query param and empty array body
+        return $this->makeRequest('/browser/' . $profileId . '/cookies?cleanCookies=true', 'POST', []);
     }
 }
 ?>

@@ -466,24 +466,149 @@ try {
                 // Toggle user status (Admin only)
                 if ($user['roles'] !== '1') {
                     http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Only Admin can toggle user status']);
+                    echo json_encode(['success' => false, 'error' => 'Admin access required']);
                     exit();
                 }
                 
-                $userId = $input['id'] ?? null;
-                
+                $userId = $input['userId'] ?? null;
                 if (!$userId) {
                     http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'User ID required']);
+                    echo json_encode(['success' => false, 'error' => 'userId is required']);
                     exit();
                 }
                 
                 $userService->toggleUserStatus($userId);
-                echo json_encode(['success' => true, 'message' => 'User status toggled successfully']);
+                echo json_encode(['success' => true, 'message' => 'User status toggled']);
+                
+            } elseif ($action === 'assign_profile_folders') {
+                // Assign profile to folders (Admin only)
+                if ($user['roles'] !== '1') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Admin access required']);
+                    exit();
+                }
+                
+                $profileId = $input['profileId'] ?? null;
+                $folderIds = $input['folderIds'] ?? [];
+                
+                if (!$profileId || !is_array($folderIds) || empty($folderIds)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'profileId and folderIds array are required']);
+                    exit();
+                }
+                
+                // Sync with GoLogin API first
+                require_once __DIR__ . '/../config/gologin.php';
+                $gologinAPI = new GoLoginAPI();
+                
+                foreach ($folderIds as $folderId) {
+                    $folder = $dataService->getFolderById($folderId);
+                    if ($folder) {
+                        $gologinAPI->addProfilesToFolder($folder['name'], [$profileId]);
+                    }
+                }
+                
+                // Update local database
+                $dataService->addProfileToFolders($profileId, $folderIds);
+                echo json_encode(['success' => true, 'message' => 'Profile assigned to folders']);
+                
+            } elseif ($action === 'remove_profile_folders') {
+                // Remove profile from folders (Admin only)
+                if ($user['roles'] !== '1') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Admin access required']);
+                    exit();
+                }
+                
+                $profileId = $input['profileId'] ?? null;
+                $folderIds = $input['folderIds'] ?? [];
+                
+                if (!$profileId || !is_array($folderIds) || empty($folderIds)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'profileId and folderIds array are required']);
+                    exit();
+                }
+                
+                // Sync with GoLogin API first
+                require_once __DIR__ . '/../config/gologin.php';
+                $gologinAPI = new GoLoginAPI();
+                
+                foreach ($folderIds as $folderId) {
+                    $folder = $dataService->getFolderById($folderId);
+                    if ($folder) {
+                        $gologinAPI->removeProfilesFromFolder($folder['name'], [$profileId]);
+                    }
+                }
+                
+                // Update local database
+                $dataService->removeProfileFromFolders($profileId, $folderIds);
+                echo json_encode(['success' => true, 'message' => 'Profile removed from folders']);
+                
+            } elseif ($action === 'set_profile_folders') {
+                // Set profile folders (replace all existing) - Admin only
+                if ($user['roles'] !== '1') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Admin access required']);
+                    exit();
+                }
+                
+                $profileId = $input['profileId'] ?? null;
+                $folderIds = $input['folderIds'] ?? [];
+                
+                if (!$profileId || !is_array($folderIds)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'profileId and folderIds array are required']);
+                    exit();
+                }
+                
+                // Get current folders
+                $currentFolders = $dataService->getProfileFolders($profileId);
+                $currentFolderIds = array_column($currentFolders, 'folder_id');
+                
+                // Determine folders to add and remove
+                $foldersToAdd = array_diff($folderIds, $currentFolderIds);
+                $foldersToRemove = array_diff($currentFolderIds, $folderIds);
+                
+                // Sync with GoLogin API
+                require_once __DIR__ . '/../config/gologin.php';
+                $gologinAPI = new GoLoginAPI();
+                
+                // Remove from old folders
+                foreach ($foldersToRemove as $folderId) {
+                    $folder = $dataService->getFolderById($folderId);
+                    if ($folder) {
+                        $gologinAPI->removeProfilesFromFolder($folder['name'], [$profileId]);
+                    }
+                }
+                
+                // Add to new folders
+                foreach ($foldersToAdd as $folderId) {
+                    $folder = $dataService->getFolderById($folderId);
+                    if ($folder) {
+                        $gologinAPI->addProfilesToFolder($folder['name'], [$profileId]);
+                    }
+                }
+                
+                // Update local database
+                $dataService->setProfileFolders($profileId, $folderIds);
+                echo json_encode(['success' => true, 'message' => 'Profile folders updated']);
+                
+            } elseif ($action === 'get_profile_folders') {
+                // Get folders for a specific profile
+                $profileId = $input['profileId'] ?? null;
+                
+                if (!$profileId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'profileId is required']);
+                    exit();
+                }
+                
+                $folders = $dataService->getProfileFolders($profileId);
+                echo json_encode(['success' => true, 'data' => $folders]);
                 
             } else {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Invalid action']);
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Endpoint not found']);
             }
             break;
             
