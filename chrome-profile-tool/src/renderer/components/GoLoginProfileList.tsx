@@ -929,7 +929,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-medium text-gray-900">Browser Profiles - GoLogin</h1>
+          <h1 className="text-lg font-medium text-gray-900">Browser Profiles</h1>
           <div className={`px-2 py-1 rounded text-xs font-medium ${
             connectionStatus === true 
               ? 'bg-green-100 text-green-800' 
