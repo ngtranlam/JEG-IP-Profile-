@@ -204,14 +204,13 @@ export class FirebaseService {
         throw new Error('No authenticated user');
       }
 
-      // Check if user already has TOTP factors enrolled
+      // Check if user already has 2FA enabled
       const enrolledFactors = multiFactor(user).enrolledFactors;
       if (enrolledFactors.length > 0) {
-        console.log(`[FirebaseService] User already has ${enrolledFactors.length} factors enrolled. Unenrolling them first.`);
-        // Unenroll all existing factors to prevent "too many factors" error
-        for (const factor of enrolledFactors) {
-          await multiFactor(user).unenroll(factor);
-        }
+        return {
+          success: false,
+          error: '2FA is already enabled. Please disable it first before setting up a new authenticator.'
+        };
       }
 
       const multiFactorSession = await multiFactor(user).getSession();

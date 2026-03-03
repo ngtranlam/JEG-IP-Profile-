@@ -37,13 +37,27 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   // Check if user is Admin (roles="1")
   const isAdmin = currentUser?.roles === '1';
 
-  // Check 2FA status from currentUser
+  // Check 2FA status from Firebase (real-time)
   useEffect(() => {
-    if (currentUser) {
-      console.log('[Sidebar] Current user:', currentUser);
-      console.log('[Sidebar] is2FAEnabled value:', (currentUser as any).is2FAEnabled);
-      setIs2FAEnabled((currentUser as any).is2FAEnabled === true);
-    }
+    const check2FAStatus = async () => {
+      if (currentUser) {
+        console.log('[Sidebar] Current user:', currentUser);
+        console.log('[Sidebar] Database is2FAEnabled value:', (currentUser as any).is2FAEnabled);
+        
+        // Check real-time status from Firebase
+        try {
+          const firebaseStatus = await window.electronAPI.auth.is2FAEnabled();
+          console.log('[Sidebar] Firebase 2FA status:', firebaseStatus);
+          setIs2FAEnabled(firebaseStatus);
+        } catch (error) {
+          console.error('[Sidebar] Failed to check 2FA status:', error);
+          // Fallback to database value
+          setIs2FAEnabled((currentUser as any).is2FAEnabled === true);
+        }
+      }
+    };
+    
+    check2FAStatus();
   }, [currentUser]);
 
   // Close dropdown when clicking outside
