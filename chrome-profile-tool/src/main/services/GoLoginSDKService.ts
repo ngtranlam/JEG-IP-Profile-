@@ -199,7 +199,7 @@ export class GoLoginSDKService {
         token: this.apiToken,
         profile_id: profileId,
         tmpdir: this.tmpDir,
-        extra_params: options?.headless ? ['--headless'] : ['--start-maximized'],
+        extra_params: options?.headless ? ['--headless'] : ['--disable-features=RendererCodeIntegrity'],
         uploadCookiesToServer: true,
         writeCookesFromServer: true,
         autoUpdateBrowser: false,
