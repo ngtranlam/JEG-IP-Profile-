@@ -107,23 +107,43 @@ class GoLoginSyncService {
     private function fetchGoLoginProfiles() {
         $allProfiles = [];
         $page = 1;
+        $profilesPerPage = 30; // GoLogin API returns 30 profiles per page
 
         try {
             do {
+                error_log("Fetching profiles page: $page");
                 $response = $this->gologinAPI->listProfiles($page);
                 
                 if (isset($response['profiles']) && is_array($response['profiles'])) {
+                    $profilesInPage = count($response['profiles']);
                     $allProfiles = array_merge($allProfiles, $response['profiles']);
+                    error_log("Fetched $profilesInPage profiles from page $page. Total so far: " . count($allProfiles));
                     
-                    // Check if there are more pages
-                    if (!isset($response['hasMore']) || !$response['hasMore']) {
+                    // Check if we have fetched all profiles
+                    // If current page has less than 30 profiles, it's the last page
+                    if ($profilesInPage < $profilesPerPage) {
+                        error_log("Last page reached (page $page has only $profilesInPage profiles)");
                         break;
                     }
+                    
+                    // Also check against total count if available
+                    if (isset($response['allProfilesCount'])) {
+                        $totalCount = $response['allProfilesCount'];
+                        error_log("Total profiles count from API: $totalCount");
+                        if (count($allProfiles) >= $totalCount) {
+                            error_log("All profiles fetched: " . count($allProfiles) . " >= $totalCount");
+                            break;
+                        }
+                    }
+                    
                     $page++;
                 } else {
+                    error_log("No profiles array in response for page $page");
                     break;
                 }
             } while (true);
+            
+            error_log("Total profiles fetched: " . count($allProfiles));
         } catch (Exception $e) {
             error_log("Error fetching profiles: " . $e->getMessage());
         }
