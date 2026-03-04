@@ -1,0 +1,4 @@
+# Add any files you want to ignore here
+*.log
+.env
+serviceAccountKey.json

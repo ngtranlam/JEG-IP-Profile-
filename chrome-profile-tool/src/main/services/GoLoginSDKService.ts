@@ -199,7 +199,13 @@ export class GoLoginSDKService {
         token: this.apiToken,
         profile_id: profileId,
         tmpdir: this.tmpDir,
-        extra_params: options?.headless ? ['--headless'] : ['--disable-features=RendererCodeIntegrity'],
+        extra_params: options?.headless 
+          ? ['--headless'] 
+          : [
+              '--disable-features=RendererCodeIntegrity',
+              '--force-device-scale-factor=1',
+              '--disable-blink-features=AutomationControlled'
+            ],
         uploadCookiesToServer: true,
         writeCookesFromServer: true,
         autoUpdateBrowser: false,

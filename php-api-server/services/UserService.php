@@ -16,8 +16,16 @@ class UserService {
         // Initialize Firebase Admin SDK
         $serviceAccountPath = __DIR__ . '/../serviceAccountKey.json';
         if (file_exists($serviceAccountPath)) {
+            // Log service account details for debugging
+            $serviceAccountData = json_decode(file_get_contents($serviceAccountPath), true);
+            error_log("Firebase Service Account Project ID: " . ($serviceAccountData['project_id'] ?? 'NOT_FOUND'));
+            error_log("Firebase Service Account Client Email: " . ($serviceAccountData['client_email'] ?? 'NOT_FOUND'));
+            
             $factory = (new Factory)->withServiceAccount($serviceAccountPath);
             $this->firebaseAuth = $factory->createAuth();
+            error_log("Firebase Auth initialized successfully");
+        } else {
+            error_log("ERROR: Service account key file not found at: " . $serviceAccountPath);
         }
     }
 
@@ -259,27 +267,56 @@ class UserService {
         $userId = $this->conn->lastInsertId();
         
         // Step 2: Create user in Firebase Auth
-        if ($this->firebaseAuth) {
-            try {
-                // Use email if provided, otherwise create fake email
-                $firebaseEmail = !empty($email) ? $email : $userName . '@jeg.local';
-                
-                $userProperties = [
-                    'email' => $firebaseEmail,
-                    'emailVerified' => true, // Auto-verify email to allow 2FA enrollment
-                    'password' => $password,
-                    'displayName' => $fullName,
-                    'disabled' => false,
-                ];
-                
-                $createdUser = $this->firebaseAuth->createUser($userProperties);
-                error_log("Created Firebase user: " . $createdUser->uid . " for userName: " . $userName);
-                
-            } catch (Exception $e) {
-                // Log error but don't fail the whole operation
-                error_log("Warning: Failed to create Firebase user for " . $userName . ": " . $e->getMessage());
-                // Note: User can still login with database credentials, but won't have Firebase auth
+        if (!$this->firebaseAuth) {
+            error_log("ERROR: Firebase Auth not initialized! Cannot create Firebase user for " . $userName);
+            throw new Exception("Firebase Auth service is not available. Please check serviceAccountKey.json file.");
+        }
+        
+        try {
+            // Use email if provided, otherwise create fake email
+            $firebaseEmail = !empty($email) ? $email : $userName . '@jeg.local';
+            
+            error_log("=== Creating Firebase User ===");
+            error_log("userName: " . $userName);
+            error_log("email: " . $firebaseEmail);
+            error_log("displayName: " . $fullName);
+            error_log("password length: " . strlen($password));
+            
+            $userProperties = [
+                'email' => $firebaseEmail,
+                'emailVerified' => true, // Auto-verify email to allow 2FA enrollment
+                'password' => $password,
+                'displayName' => $fullName,
+                'disabled' => false,
+            ];
+            
+            error_log("User properties: " . json_encode(array_merge($userProperties, ['password' => '***'])));
+            
+            $createdUser = $this->firebaseAuth->createUser($userProperties);
+            error_log("SUCCESS: Created Firebase user: " . $createdUser->uid . " for userName: " . $userName);
+            
+        } catch (Exception $e) {
+            // Log detailed error and throw exception
+            error_log("=== Firebase User Creation Failed ===");
+            error_log("ERROR: " . $e->getMessage());
+            error_log("Exception class: " . get_class($e));
+            error_log("Exception code: " . $e->getCode());
+            
+            // Try to get more details from the exception
+            if (method_exists($e, 'getErrors')) {
+                error_log("Firebase errors: " . json_encode($e->getErrors()));
             }
+            
+            // Log full exception for debugging
+            error_log("Full exception: " . print_r($e, true));
+            
+            // Delete the database user since Firebase creation failed
+            $deleteSql = "DELETE FROM users WHERE id = :userId";
+            $deleteStmt = $this->conn->prepare($deleteSql);
+            $deleteStmt->bindParam(':userId', $userId);
+            $deleteStmt->execute();
+            
+            throw new Exception("Failed to create Firebase user: " . $e->getMessage());
         }
         
         return $userId;
