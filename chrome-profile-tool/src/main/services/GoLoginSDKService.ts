@@ -218,10 +218,20 @@ export class GoLoginSDKService {
         ];
         
         if (isWindows) {
-          // Windows: Use maximize for full screen
+          // Windows: Force full screen with proper scaling
           extraParams = [
-            ...commonFlags,
-            '--start-maximized'
+            '--disable-features=RendererCodeIntegrity',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+            '--start-maximized',
+            '--start-fullscreen',
+            '--disable-infobars',
+            '--no-first-run',
+            '--disable-session-crashed-bubble'
           ];
         } else if (isMac) {
           // macOS: Use dynamic window sizing (respects menu bar and dock)
