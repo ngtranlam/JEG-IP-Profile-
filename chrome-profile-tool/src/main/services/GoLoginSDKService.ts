@@ -195,11 +195,68 @@ export class GoLoginSDKService {
       const gologinModule = await importGologin('gologin');
       const { GoLogin } = gologinModule;
       
+      // Detect OS
+      const isWindows = process.platform === 'win32';
+      const isMac = process.platform === 'darwin';
+      
+      // Build extra_params based on OS
+      let extraParams: string[] = [];
+      
+      if (options?.headless) {
+        extraParams = ['--headless'];
+      } else {
+        // Common flags for all platforms
+        const commonFlags = [
+          '--disable-features=RendererCodeIntegrity',
+          '--force-device-scale-factor=1',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ];
+        
+        if (isWindows) {
+          // Windows: Use maximize for full screen
+          extraParams = [
+            ...commonFlags,
+            '--start-maximized'
+          ];
+        } else if (isMac) {
+          // macOS: Use dynamic window sizing (respects menu bar and dock)
+          const { screen } = require('electron');
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+          
+          // Calculate optimal window size (85% of screen, minimum 1280x900 for UI compatibility)
+          const windowWidth = Math.max(Math.floor(screenWidth * 0.85), 1280);
+          const windowHeight = Math.max(Math.floor(screenHeight * 0.85), 900);
+          
+          // Calculate center position
+          const windowX = Math.floor((screenWidth - windowWidth) / 2);
+          const windowY = Math.floor((screenHeight - windowHeight) / 2);
+          
+          extraParams = [
+            ...commonFlags,
+            `--window-size=${windowWidth},${windowHeight}`,
+            `--window-position=${windowX},${windowY}`,
+            '--min-window-size=1280,900'
+          ];
+        } else {
+          // Linux or other: Use maximize
+          extraParams = [
+            ...commonFlags,
+            '--start-maximized'
+          ];
+        }
+      }
+      
       const gologinInstance = new GoLogin({
         token: this.apiToken,
         profile_id: profileId,
         tmpdir: this.tmpDir,
-        extra_params: options?.headless ? ['--headless'] : [],
+        extra_params: extraParams,
         uploadCookiesToServer: true,
         writeCookesFromServer: true,
         autoUpdateBrowser: false,
