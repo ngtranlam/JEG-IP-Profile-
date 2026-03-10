@@ -218,10 +218,16 @@ export class GoLoginSDKService {
         ];
         
         if (isWindows) {
-          // Windows: Use maximize for full screen
+          // Windows: Use full screen resolution
+          const { screen } = require('electron');
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+          
           extraParams = [
             ...commonFlags,
-            '--start-maximized'
+            `--window-size=${screenWidth},${screenHeight}`,
+            `--window-position=0,0`,
+            '--disable-infobars'
           ];
         } else if (isMac) {
           // macOS: Use dynamic window sizing (respects menu bar and dock)
