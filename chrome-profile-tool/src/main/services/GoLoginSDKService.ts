@@ -274,24 +274,51 @@ export class GoLoginSDKService {
       // Chrome flags like --start-maximized are unreliable on Windows when launched programmatically
       if (isWindows && !options?.headless) {
         try {
+          console.log('[CDP] Starting window management for Windows...');
+          console.log('[CDP] WebSocket URL:', wsUrl);
+          
           // Wait a bit for browser to fully initialize
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
           const { screen } = require('electron');
           const primaryDisplay = screen.getPrimaryDisplay();
           const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+          console.log(`[CDP] Target screen size: ${screenWidth}x${screenHeight}`);
           
           // Connect to browser via CDP
           const CDP = require('chrome-remote-interface');
-          const client = await CDP({ target: wsUrl });
+          console.log('[CDP] Attempting to connect to browser...');
+          
+          // Try different connection methods
+          let client;
+          try {
+            // Method 1: Direct wsUrl
+            client = await CDP({ target: wsUrl });
+          } catch (e1) {
+            console.log('[CDP] Direct wsUrl failed, trying alternative methods...');
+            try {
+              // Method 2: Parse wsUrl to get port and connect differently
+              const url = new URL(wsUrl);
+              const port = url.port || '9222';
+              client = await CDP({ port: parseInt(port) });
+            } catch (e2) {
+              console.log('[CDP] Port-based connection failed, trying localhost...');
+              // Method 3: Default localhost connection
+              client = await CDP();
+            }
+          }
+          
+          console.log('[CDP] Successfully connected to browser');
           const { Browser } = client;
           
           // Step 1: Get current viewport info (as recommended by GoLogin support)
+          console.log('[CDP] Getting current window info...');
           const viewport = await Browser.getWindowForTarget();
-          console.log('Current viewport:', viewport);
+          console.log('[CDP] Current viewport:', JSON.stringify(viewport, null, 2));
           
           // Step 2: Set window bounds to full screen using the windowId from viewport
-          await Browser.setWindowBounds({
+          console.log(`[CDP] Setting window bounds to ${screenWidth}x${screenHeight}...`);
+          const result = await Browser.setWindowBounds({
             windowId: viewport.windowId,
             bounds: {
               left: 0,
@@ -302,10 +329,21 @@ export class GoLoginSDKService {
             }
           });
           
-          console.log(`Successfully set window bounds to ${screenWidth}x${screenHeight} via CDP`);
+          console.log('[CDP] SetWindowBounds result:', JSON.stringify(result, null, 2));
+          
+          // Verify the change
+          const newViewport = await Browser.getWindowForTarget();
+          console.log('[CDP] New viewport after resize:', JSON.stringify(newViewport, null, 2));
+          
+          console.log(`[CDP] Successfully set window bounds to ${screenWidth}x${screenHeight}`);
           await client.close();
-        } catch (error) {
-          console.warn('Failed to set window bounds via CDP:', error);
+        } catch (error: any) {
+          console.error('[CDP] Failed to set window bounds via CDP:', error);
+          console.error('[CDP] Error details:', {
+            message: error?.message || 'Unknown error',
+            stack: error?.stack || 'No stack trace',
+            wsUrl: wsUrl
+          });
           // Continue execution even if CDP fails - browser will still work with default size
         }
       }
