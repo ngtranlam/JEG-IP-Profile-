@@ -218,15 +218,10 @@ export class GoLoginSDKService {
         ];
         
         if (isWindows) {
-          // Windows: Use full screen resolution
-          const { screen } = require('electron');
-          const primaryDisplay = screen.getPrimaryDisplay();
-          const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-          
+          // Windows: Use CDP for window management (no Chrome window flags)
+          // Chrome flags like --start-maximized are unreliable on Windows
           extraParams = [
             ...commonFlags,
-            `--window-size=${screenWidth},${screenHeight}`,
-            `--window-position=0,0`,
             '--disable-infobars'
           ];
         } else if (isMac) {
@@ -273,6 +268,46 @@ export class GoLoginSDKService {
       
       if (status !== 'success') {
         throw new Error('Failed to start profile');
+      }
+
+      // Apply CDP-based window management for Windows (GoLogin support recommendation)
+      // Chrome flags like --start-maximized are unreliable on Windows when launched programmatically
+      if (isWindows && !options?.headless) {
+        try {
+          // Wait a bit for browser to fully initialize
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const { screen } = require('electron');
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+          
+          // Connect to browser via CDP
+          const CDP = require('chrome-remote-interface');
+          const client = await CDP({ target: wsUrl });
+          const { Browser } = client;
+          
+          // Step 1: Get current viewport info (as recommended by GoLogin support)
+          const viewport = await Browser.getWindowForTarget();
+          console.log('Current viewport:', viewport);
+          
+          // Step 2: Set window bounds to full screen using the windowId from viewport
+          await Browser.setWindowBounds({
+            windowId: viewport.windowId,
+            bounds: {
+              left: 0,
+              top: 0,
+              width: screenWidth,
+              height: screenHeight,
+              windowState: 'normal'
+            }
+          });
+          
+          console.log(`Successfully set window bounds to ${screenWidth}x${screenHeight} via CDP`);
+          await client.close();
+        } catch (error) {
+          console.warn('Failed to set window bounds via CDP:', error);
+          // Continue execution even if CDP fails - browser will still work with default size
+        }
       }
 
       // Get browser PID to kill later

@@ -60,6 +60,7 @@
     "adm-zip": "^0.5.16",
     "autoprefixer": "^10.4.16",
     "axios": "^1.6.2",
+    "chrome-remote-interface": "^0.34.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "crypto-js": "^4.2.0",
@@ -102,7 +103,9 @@
       {
         "from": ".env",
         "to": ".env",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asarUnpack": [
