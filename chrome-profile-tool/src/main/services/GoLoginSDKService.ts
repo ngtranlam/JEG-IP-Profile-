@@ -200,12 +200,14 @@ export class GoLoginSDKService {
       const isMac = process.platform === 'darwin';
       
       // Build extra_params based on OS
+      // IMPORTANT: GoLogin SDK internally adds --window-size based on profile's navigator.resolution
+      // Do NOT add --window-size in extra_params to avoid conflicts
       let extraParams: string[] = [];
       
       if (options?.headless) {
         extraParams = ['--headless'];
       } else {
-        // Common flags for all platforms
+        // Common flags for all platforms (no window sizing flags)
         const commonFlags = [
           '--disable-features=RendererCodeIntegrity',
           '--force-device-scale-factor=1',
@@ -217,20 +219,13 @@ export class GoLoginSDKService {
           '--disable-backgrounding-occluded-windows'
         ];
         
-        if (isWindows) {
-          // Windows: Only use common flags, window will be maximized via CDP after launch
-          extraParams = [...commonFlags];
-        } else if (isMac) {
-          // macOS: Use dynamic window sizing (respects menu bar and dock)
+        if (isMac) {
+          // macOS: Add window-position to center the window
           const { screen } = require('electron');
           const primaryDisplay = screen.getPrimaryDisplay();
           const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-          
-          // Calculate optimal window size (85% of screen, minimum 1280x900 for UI compatibility)
           const windowWidth = Math.max(Math.floor(screenWidth * 0.85), 1280);
           const windowHeight = Math.max(Math.floor(screenHeight * 0.85), 900);
-          
-          // Calculate center position
           const windowX = Math.floor((screenWidth - windowWidth) / 2);
           const windowY = Math.floor((screenHeight - windowHeight) / 2);
           
@@ -241,11 +236,8 @@ export class GoLoginSDKService {
             '--min-window-size=1280,900'
           ];
         } else {
-          // Linux or other: Use maximize
-          extraParams = [
-            ...commonFlags,
-            '--start-maximized'
-          ];
+          // Windows & Linux: Only common flags, let SDK handle window-size via profile resolution
+          extraParams = [...commonFlags];
         }
       }
       
@@ -260,39 +252,31 @@ export class GoLoginSDKService {
         restoreLastSession: true,
       });
 
+      // Update profile resolution for Windows to match actual screen size
+      // GoLogin SDK uses profile's navigator.resolution to set --window-size internally
+      // changeProfileResolution() is the official SDK method for this (gologin.js line 1499)
+      if (isWindows && !options?.headless) {
+        try {
+          const { screen } = require('electron');
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width, height } = primaryDisplay.bounds;
+          const scaleFactor = primaryDisplay.scaleFactor;
+          // Account for Windows display scaling (e.g. 150% scaling on 1920x1080 → bounds returns 1280x720)
+          const physicalWidth = Math.round(width * scaleFactor);
+          const physicalHeight = Math.round(height * scaleFactor);
+          const resolution = `${physicalWidth}x${physicalHeight}`;
+          
+          await gologinInstance.changeProfileResolution(resolution);
+          console.log(`Updated profile resolution to ${resolution} for Windows full screen`);
+        } catch (resError) {
+          console.warn('Failed to update profile resolution:', resError);
+        }
+      }
+
       const { status, wsUrl } = await gologinInstance.start();
       
       if (status !== 'success') {
         throw new Error('Failed to start profile');
-      }
-
-      // Maximize window via CDP on Windows using puppeteer-core
-      // Chrome flags like --start-maximized are unreliable on Windows (confirmed by GoLogin support)
-      // puppeteer-core is used because wsUrl from GoLogin SDK is puppeteer-compatible
-      if (isWindows && !options?.headless) {
-        try {
-          const puppeteer = require('puppeteer-core');
-          const puppeteerBrowser = await puppeteer.connect({
-            browserWSEndpoint: wsUrl,
-            defaultViewport: null,
-          });
-
-          const pages = await puppeteerBrowser.pages();
-          if (pages.length > 0) {
-            const cdpSession = await pages[0].createCDPSession();
-            const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
-            await cdpSession.send('Browser.setWindowBounds', {
-              windowId,
-              bounds: { windowState: 'maximized' },
-            });
-            console.log(`Window maximized via CDP for profile ${profileId}`);
-          }
-
-          // Disconnect only - do NOT close the browser
-          puppeteerBrowser.disconnect();
-        } catch (cdpError) {
-          console.warn('Failed to maximize window via CDP:', cdpError);
-        }
       }
 
       // Get browser PID to kill later
