@@ -218,12 +218,8 @@ export class GoLoginSDKService {
         ];
         
         if (isWindows) {
-          // Windows: Use fullscreen mode - simpler and more reliable than window-size
-          extraParams = [
-            ...commonFlags,
-            '--start-fullscreen',
-            '--disable-infobars'
-          ];
+          // Windows: Only use common flags, window will be maximized via CDP after launch
+          extraParams = [...commonFlags];
         } else if (isMac) {
           // macOS: Use dynamic window sizing (respects menu bar and dock)
           const { screen } = require('electron');
@@ -268,6 +264,35 @@ export class GoLoginSDKService {
       
       if (status !== 'success') {
         throw new Error('Failed to start profile');
+      }
+
+      // Maximize window via CDP on Windows using puppeteer-core
+      // Chrome flags like --start-maximized are unreliable on Windows (confirmed by GoLogin support)
+      // puppeteer-core is used because wsUrl from GoLogin SDK is puppeteer-compatible
+      if (isWindows && !options?.headless) {
+        try {
+          const puppeteer = require('puppeteer-core');
+          const puppeteerBrowser = await puppeteer.connect({
+            browserWSEndpoint: wsUrl,
+            defaultViewport: null,
+          });
+
+          const pages = await puppeteerBrowser.pages();
+          if (pages.length > 0) {
+            const cdpSession = await pages[0].createCDPSession();
+            const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
+            await cdpSession.send('Browser.setWindowBounds', {
+              windowId,
+              bounds: { windowState: 'maximized' },
+            });
+            console.log(`Window maximized via CDP for profile ${profileId}`);
+          }
+
+          // Disconnect only - do NOT close the browser
+          puppeteerBrowser.disconnect();
+        } catch (cdpError) {
+          console.warn('Failed to maximize window via CDP:', cdpError);
+        }
       }
 
       // Get browser PID to kill later
