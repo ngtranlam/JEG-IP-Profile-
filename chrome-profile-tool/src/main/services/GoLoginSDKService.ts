@@ -210,7 +210,6 @@ export class GoLoginSDKService {
         // Common flags for all platforms (no window sizing flags)
         const commonFlags = [
           '--disable-features=RendererCodeIntegrity',
-          '--force-device-scale-factor=1',
           '--disable-blink-features=AutomationControlled',
           '--disable-web-security',
           '--disable-features=VizDisplayCompositor',
@@ -231,12 +230,13 @@ export class GoLoginSDKService {
           
           extraParams = [
             ...commonFlags,
+            '--force-device-scale-factor=1',
             `--window-size=${windowWidth},${windowHeight}`,
             `--window-position=${windowX},${windowY}`,
             '--min-window-size=1280,900'
           ];
         } else {
-          // Windows & Linux: Only common flags, let SDK handle window-size via profile resolution
+          // Windows & Linux: No force-device-scale-factor to respect OS display scaling
           extraParams = [...commonFlags];
         }
       }
