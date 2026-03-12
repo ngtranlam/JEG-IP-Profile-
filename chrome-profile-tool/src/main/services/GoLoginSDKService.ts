@@ -279,23 +279,13 @@ export class GoLoginSDKService {
         throw new Error('Failed to start profile');
       }
 
-      // Get browser PID to kill later
-      try {
-        const browserProcess = gologinInstance.getOrbitaBrowserPid?.();
-        if (browserProcess && typeof browserProcess === 'number') {
-          this.browserPids.set(profileId, browserProcess);
-          console.log(`Browser PID for profile ${profileId}: ${browserProcess}`);
-        }
-      } catch (err) {
-        console.warn('Could not get browser PID:', err);
-      }
-
-      // Store both GoLogin instance and browser info
+      // Store GoLogin instance and browser info
       this.activeGologinInstances.set(profileId, gologinInstance);
       this.activeBrowsers.set(profileId, { wsUrl });
       
-      // Start monitoring browser process
-      this.startBrowserMonitoring(profileId);
+      // Monitor browser process via SDK's processSpawned child process
+      // This detects when user manually closes the browser window
+      this.startBrowserMonitoring(profileId, gologinInstance);
       
       console.log(`Profile ${profileId} launched successfully via SDK`);
       
@@ -310,25 +300,29 @@ export class GoLoginSDKService {
     }
   }
 
-  private startBrowserMonitoring(profileId: string) {
-    const browserPid = this.browserPids.get(profileId);
-    if (!browserPid) return;
+  private startBrowserMonitoring(profileId: string, gologinInstance: any) {
+    const childProcess = gologinInstance.processSpawned;
+    if (!childProcess || !childProcess.pid) {
+      console.warn(`No browser process found for profile ${profileId}, using fallback polling`);
+      return;
+    }
 
-    // Check every 2 seconds if browser process is still alive
-    const monitor = setInterval(() => {
-      try {
-        // Try to send signal 0 to check if process exists
-        process.kill(browserPid, 0);
-      } catch (err: any) {
-        if (err.code === 'ESRCH') {
-          // Process not found - browser was closed
-          console.log(`Browser process ${browserPid} for profile ${profileId} was closed manually`);
-          this.handleBrowserClosed(profileId);
-        }
-      }
-    }, 2000);
+    console.log(`Monitoring browser process PID ${childProcess.pid} for profile ${profileId}`);
+    this.browserPids.set(profileId, childProcess.pid);
 
-    this.browserMonitors.set(profileId, monitor);
+    // Listen for browser process exit (user closed browser manually)
+    const onExit = (code: number | null, signal: string | null) => {
+      // Ignore if profile was already stopped programmatically
+      if (!this.activeGologinInstances.has(profileId)) return;
+      
+      console.log(`Browser process exited for profile ${profileId} (code=${code}, signal=${signal})`);
+      this.handleBrowserClosed(profileId);
+    };
+
+    childProcess.once('exit', onExit);
+
+    // Store reference so we can remove listener if needed
+    this.browserMonitors.set(profileId, { removeListener: () => childProcess.removeListener('exit', onExit) } as any);
   }
 
   private async handleBrowserClosed(profileId: string) {
@@ -367,64 +361,35 @@ export class GoLoginSDKService {
     try {
       console.log(`Stopping profile ${profileId}...`);
       
-      // Stop monitoring first
-      const monitor = this.browserMonitors.get(profileId);
-      if (monitor) {
-        clearInterval(monitor);
+      // Remove browser exit listener to prevent handleBrowserClosed from firing
+      const monitorRef = this.browserMonitors.get(profileId);
+      if (monitorRef) {
+        if (typeof (monitorRef as any).removeListener === 'function') {
+          (monitorRef as any).removeListener();
+        } else {
+          clearInterval(monitorRef);
+        }
         this.browserMonitors.delete(profileId);
       }
       
       const gologinInstance = this.activeGologinInstances.get(profileId);
-      const browserPid = this.browserPids.get(profileId);
       
       if (gologinInstance) {
-        // Step 1: Close browser gracefully so Chrome flushes session files to disk
-        // This follows the same pattern as GoLogin SDK's killAndCommit():
-        // kill browser first → wait → then upload session data
-        if (browserPid) {
-          try {
-            console.log(`Closing browser gracefully (SIGTERM) for profile ${profileId}...`);
-            process.kill(browserPid, 'SIGTERM');
-            
-            // Wait for browser to close (up to 5 seconds)
-            for (let i = 0; i < 10; i++) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              try {
-                process.kill(browserPid, 0); // Check if still alive
-              } catch {
-                console.log(`Browser process ${browserPid} closed gracefully`);
-                break;
-              }
-            }
-            
-            // Force kill if still alive after 5 seconds
-            try {
-              process.kill(browserPid, 0);
-              process.kill(browserPid, 'SIGKILL');
-              console.log(`Browser process ${browserPid} force killed`);
-            } catch {
-              // Already dead - good
-            }
-          } catch (err: any) {
-            if (err.code !== 'ESRCH') {
-              console.warn(`Error closing browser:`, err);
-            }
-          }
-          this.browserPids.delete(profileId);
-        }
-        
-        // Step 2: Upload session data via GoLogin SDK
-        // Browser is now closed, session files are flushed to disk
+        // Use SDK's killAndCommit() - the official way to stop a profile:
+        // 1. killBrowser() - kills the browser process
+        // 2. delay(processKillTimeout) - waits for session files to flush
+        // 3. stopAndCommit() - uploads session data (cookies, tabs, profile)
         try {
-          console.log(`Uploading session data for profile ${profileId}...`);
-          await gologinInstance.stop();
-          console.log(`Session data uploaded for profile ${profileId}`);
+          console.log(`Killing browser and uploading session for profile ${profileId}...`);
+          await gologinInstance.killAndCommit({ posting: true });
+          console.log(`Profile ${profileId} stopped and session uploaded`);
         } catch (err) {
-          console.warn(`Error uploading session for profile ${profileId}:`, err);
+          console.warn(`Error in killAndCommit for profile ${profileId}:`, err);
         }
         
         this.activeGologinInstances.delete(profileId);
         this.activeBrowsers.delete(profileId);
+        this.browserPids.delete(profileId);
       } else {
         console.warn(`No active GoLogin instance found for profile ${profileId}`);
       }
