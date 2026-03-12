@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Globe, FolderOpen, Monitor, ChevronRight, Play } from 'lucide-react';
+import { Users, Globe, FolderOpen, Monitor, ChevronRight, Play, Shield, Clock, X, Loader2, Check, Tag, Calendar, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface GoLoginStats {
   totalProfiles: number;
@@ -19,14 +19,14 @@ interface DashboardProps {
   goLoginStats: GoLoginStats;
   onRefresh: () => Promise<void>;
   currentUser?: User | null;
-  onViewChange?: (view: 'dashboard' | 'profiles' | 'folders' | 'users') => void;
+  onViewChange?: (view: 'dashboard' | 'profiles' | 'folders' | 'users' | 'proxy') => void;
   onSelectFolder?: (folderId: string) => void;
 }
 
-// SVG Donut Chart component
+// SVG Donut Chart component for Profile Overview
 function DonutChart({ running, available, total }: { running: number; available: number; total: number }) {
-  const size = 140;
-  const strokeWidth = 18;
+  const size = 120;
+  const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const runningPct = total > 0 ? running / total : 0;
@@ -36,28 +36,104 @@ function DonutChart({ running, available, total }: { running: number; available:
   return (
     <div className="relative inline-flex items-center justify-center">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        {/* Available (background) */}
-        <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none"
-          stroke="#f3f4f6"
-          strokeWidth={strokeWidth}
-        />
-        {/* Running (foreground) */}
-        <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none"
-          stroke="#f97316"
-          strokeWidth={strokeWidth}
-          strokeDasharray={`${runningDash} ${availableDash}`}
-          strokeLinecap="round"
-          className="transition-all duration-700 ease-out"
-        />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f97316" strokeWidth={strokeWidth}
+          strokeDasharray={`${runningDash} ${availableDash}`} strokeLinecap="round" className="transition-all duration-700 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-gray-900">{running}</span>
-        <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Running</span>
+        <span className="text-xl font-bold text-gray-900">{running}</span>
+        <span className="text-[9px] text-gray-400 uppercase tracking-wider font-medium">Running</span>
       </div>
+    </div>
+  );
+}
+
+// Filled Pie Chart for Proxy Status (active, expiring, inactive) with percentage labels
+function ProxyStatusChart({ active, expiring, inactive }: { active: number; expiring: number; inactive: number }) {
+  const total = active + expiring + inactive;
+  const size = 280;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = 105;
+  const labelRadius = radius * 0.65;
+  const outerLabelRadius = radius + 28;
+
+  const segments = [
+    { value: active, color: '#10b981', label: 'Active' },
+    { value: expiring, color: '#f59e0b', label: 'Expiring' },
+    { value: inactive, color: '#ef4444', label: 'Inactive' },
+  ].filter(s => s.value > 0);
+
+  // Build pie slices
+  let cumulativeAngle = -Math.PI / 2; // start from top
+  const slices = segments.map(seg => {
+    const pct = total > 0 ? seg.value / total : 0;
+    const angle = pct * 2 * Math.PI;
+    const startAngle = cumulativeAngle;
+    const endAngle = cumulativeAngle + angle;
+    const midAngle = startAngle + angle / 2;
+    cumulativeAngle = endAngle;
+
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(endAngle);
+    const y2 = cy + radius * Math.sin(endAngle);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+
+    const labelX = cx + labelRadius * Math.cos(midAngle);
+    const labelY = cy + labelRadius * Math.sin(midAngle);
+    const outerX = cx + outerLabelRadius * Math.cos(midAngle);
+    const outerY = cy + outerLabelRadius * Math.sin(midAngle);
+
+    return { ...seg, pct, path, labelX, labelY, outerX, outerY, midAngle };
+  });
+
+  if (total === 0) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={cx} cy={cy} r={radius} fill="#f3f4f6" />
+          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" className="text-sm font-bold" fill="#9ca3af">No Data</text>
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Drop shadow filter */}
+        <defs>
+          <filter id="pieShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.1" />
+          </filter>
+        </defs>
+        <g filter="url(#pieShadow)">
+          {slices.map((slice, i) => (
+            <path key={i} d={slice.path} fill={slice.color} className="transition-all duration-700 ease-out" stroke="white" strokeWidth="2" />
+          ))}
+        </g>
+        {/* Percentage labels inside slices */}
+        {slices.map((slice, i) => (
+          slice.pct >= 0.05 && (
+            <text key={`pct-${i}`} x={slice.labelX} y={slice.labelY} textAnchor="middle" dominantBaseline="central"
+              fill="white" fontSize="16" fontWeight="700" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+              {Math.round(slice.pct * 100)}%
+            </text>
+          )
+        ))}
+        {/* Outer labels */}
+        {slices.map((slice, i) => {
+          const anchor = slice.outerX > cx ? 'start' : slice.outerX < cx ? 'end' : 'middle';
+          return (
+            <text key={`lbl-${i}`} x={slice.outerX} y={slice.outerY} textAnchor={anchor} dominantBaseline="central"
+              fill="#374151" fontSize="12" fontWeight="600">
+              {slice.label}
+            </text>
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -294,9 +370,110 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
     return date.toLocaleDateString();
   };
 
+  // ─── Proxy Dashboard Data ───
+  const [proxyStats, setProxyStats] = useState({ active: 0, expiring_soon: 0, inactive: 0, total: 0 });
+  const [expiringProxies, setExpiringProxies] = useState<any[]>([]);
+
+  // Extend modal state
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendProxyData, setExtendProxyData] = useState<any>(null);
+  const [extendPeriod, setExtendPeriod] = useState(0);
+  const [extendCoupon, setExtendCoupon] = useState('');
+  const [extendPrice, setExtendPrice] = useState<{price: number; currency: string} | null>(null);
+  const [extendPriceLoading, setExtendPriceLoading] = useState(false);
+  const [extendLoading, setExtendLoading] = useState(false);
+
+  const fetchProxyData = useCallback(async () => {
+    try {
+      // Sync first
+      await window.electronAPI.extProxySync().catch(() => {});
+      // Fetch stats
+      const stats = await window.electronAPI.extProxyStats();
+      if (stats) {
+        setProxyStats({
+          active: stats.active || 0,
+          expiring_soon: stats.expiring_soon || 0,
+          inactive: stats.inactive || 0,
+          total: stats.total || 0,
+        });
+      }
+      // Fetch expiring soon proxies
+      const result = await window.electronAPI.extProxyList({ status: 'expiring_soon' });
+      const list = result?.proxies || result || [];
+      setExpiringProxies(Array.isArray(list) ? list.slice(0, 20) : []);
+    } catch (err) {
+      console.error('Failed to fetch proxy data:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProxyData();
+  }, [fetchProxyData]);
+
+  // Extend modal handlers
+  const openExtendModal = (proxy: any) => {
+    setExtendProxyData(proxy);
+    setExtendPeriod(0);
+    setExtendCoupon('');
+    setExtendPrice(null);
+    setShowExtendModal(true);
+  };
+
+  const handleExtensionPrice = async () => {
+    if (!extendProxyData || !extendPeriod) return;
+    const proxyId = extendProxyData.id || extendProxyData.proxy_id;
+    try {
+      setExtendPriceLoading(true);
+      const result = await window.electronAPI.extProxyExtensionPrice(proxyId, extendPeriod);
+      const inner = result?.data ?? result;
+      const price = parseFloat(inner?.finalPrice ?? inner?.price ?? 0);
+      const currency = inner?.currency || 'USD';
+      setExtendPrice({ price, currency });
+    } catch (err: any) {
+      console.error('Failed to get extension price:', err);
+      alert('Failed to calculate price: ' + (err.message || 'Unknown error'));
+      setExtendPrice(null);
+    } finally {
+      setExtendPriceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showExtendModal || !extendProxyData || !extendPeriod) return;
+    const timer = setTimeout(() => handleExtensionPrice(), 300);
+    return () => clearTimeout(timer);
+  }, [extendPeriod, showExtendModal]);
+
+  const handleExtendProxy = async () => {
+    if (!extendProxyData || !extendPeriod) return;
+    const proxyId = extendProxyData.id || extendProxyData.proxy_id;
+    if (!confirm(`Extend proxy ${proxyId} by ${extendPeriod} month(s) for $${extendPrice?.price?.toFixed(2) || '?'}?`)) return;
+    try {
+      setExtendLoading(true);
+      await window.electronAPI.extProxyExtend(proxyId, extendPeriod, extendCoupon || undefined);
+      setShowExtendModal(false);
+      fetchProxyData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to extend proxy');
+    } finally {
+      setExtendLoading(false);
+    }
+  };
+
+  const formatExpiry = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.ceil((date.getTime() - now.getTime()) / 86400000);
+    if (diffDays < 0) return 'Expired';
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day left';
+    return `${diffDays} days left`;
+  };
+
   return (
-    <div className="h-full overflow-y-auto bg-gray-50/30">
-      <div className="p-6 space-y-5 max-w-[1400px] mx-auto">
+    <div className="h-full flex flex-col bg-gray-50/30">
+      <div className="flex flex-col flex-1 min-h-0 p-6 gap-4 max-w-[1400px] mx-auto w-full">
 
         {/* Header */}
         <div>
@@ -350,19 +527,20 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
             <p className="text-xs text-gray-400 mt-1">Click to view all</p>
           </div>
 
-          {/* Available Profiles */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
+          {/* Total Proxy */}
+          <div
+            className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
+            onClick={() => onViewChange?.('proxy')}
+          >
             <div className="flex items-center justify-between mb-3">
-              <div className="bg-amber-50 p-2.5 rounded-lg">
-                <Monitor className="h-5 w-5 text-amber-600" />
+              <div className="bg-emerald-50 p-2.5 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                <Shield className="h-5 w-5 text-emerald-600" />
               </div>
-              {availableCount > 0 && (
-                <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Ready</span>
-              )}
+              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
             </div>
-            <p className="text-sm text-gray-500 mb-0.5">Available</p>
-            <p className="text-3xl font-bold text-gray-900">{availableCount}</p>
-            <p className="text-xs text-gray-400 mt-1">Ready to launch</p>
+            <p className="text-sm text-gray-500 mb-0.5">Total Proxy</p>
+            <p className="text-3xl font-bold text-gray-900">{proxyStats.total}</p>
+            <p className="text-xs text-gray-400 mt-1">{proxyStats.active} active • {proxyStats.expiring_soon} expiring</p>
           </div>
 
           {/* Total Users (Admin) / Folders (Seller) */}
@@ -395,141 +573,253 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
           )}
         </div>
 
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          
-          {/* Recent Profiles - 2 cols */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm">
+        {/* Content Grid: 3 columns, fill remaining height */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+
+          {/* Col 1: Proxy Status Chart */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Proxy Status</h2>
+            <div className="flex-1 flex items-center justify-center">
+              <ProxyStatusChart
+                active={proxyStats.active}
+                expiring={proxyStats.expiring_soon}
+                inactive={proxyStats.inactive}
+              />
+            </div>
+            <div className="space-y-2.5 mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-gray-600">Active</span>
+                </div>
+                <span className="text-xs font-bold text-gray-900">{proxyStats.active}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <span className="text-xs text-gray-600">Expiring Soon</span>
+                </div>
+                <span className="text-xs font-bold text-gray-900">{proxyStats.expiring_soon}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="text-xs text-gray-600">Inactive</span>
+                </div>
+                <span className="text-xs font-bold text-gray-900">{proxyStats.inactive}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Col 2: Expiring Soon Proxies */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
             <div
-              className="flex items-center justify-between px-5 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group"
-              onClick={() => onViewChange?.('profiles')}
+              className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+              onClick={() => onViewChange?.('proxy')}
             >
-              <h2 className="text-base font-semibold text-gray-900">Recent Profiles</h2>
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Expiring Soon
+              </h2>
               <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                 View all <ChevronRight className="w-3.5 h-3.5" />
               </div>
             </div>
-            {recentProfiles.length > 0 ? (
-              <div className="divide-y divide-gray-50">
-                {recentProfiles.map((profile) => {
-                  const profileId = profile.profile_id || profile.id;
-                  const isRunning = isProfileRunning(profileId);
+            {expiringProxies.length > 0 ? (
+              <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                {expiringProxies.map((proxy, idx) => {
+                  const proxyId = proxy.id || proxy.proxy_id;
+                  const ip = proxy.public_ip || proxy.publicIp || '';
+                  const expires = proxy.expires_formatted || proxy.expires_at || proxy.expires || '';
+                  const seller = proxy.seller_full_name || proxy.seller_username || proxy.name || '';
                   return (
-                    <div key={profile.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50/50 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          isRunning ? 'bg-orange-100' : 'bg-gray-100'
-                        }`}>
-                          {isRunning ? (
-                            <Play className="h-3.5 w-3.5 text-orange-600 fill-orange-600" />
-                          ) : (
-                            <Globe className="h-4 w-4 text-gray-400" />
+                    <div key={proxyId || idx} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50/50 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900 font-mono truncate">{ip || proxyId}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-amber-600 font-medium">{formatExpiry(expires)}</p>
+                          {isAdmin && seller && (
+                            <span className="text-xs text-gray-400">• {seller}</span>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{profile.name}</p>
-                          <p className="text-xs text-gray-400">
-                            {profile.os?.toUpperCase()} • {profile.browserType || 'chrome'}
-                          </p>
-                        </div>
                       </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                        {isRunning ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-orange-500" />
-                            </span>
-                            Running
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                            Ready
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openExtendModal(proxy); }}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors flex-shrink-0 ml-2"
+                      >
+                        <Clock className="w-3.5 h-3.5" /> Extend
+                      </button>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 px-5">
-                <Globe className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500 font-medium">No profiles found</p>
-                <p className="text-xs text-gray-400 mt-1">Create your first profile to get started</p>
+              <div className="flex-1 flex flex-col items-center justify-center px-5">
+                <Shield className="h-8 w-8 text-gray-300 mb-2" />
+                <p className="text-xs text-gray-400">No proxies expiring soon</p>
               </div>
             )}
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-5">
-
+          {/* Col 3: Profile Overview + Folders */}
+          <div className="flex flex-col gap-4 min-h-0">
             {/* Profile Overview Chart */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">Profile Overview</h2>
-              <div className="flex items-center justify-center mb-4">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex-shrink-0">
+              <h2 className="text-sm font-semibold text-gray-900 mb-2">Profile Overview</h2>
+              <div className="flex items-center justify-center mb-2">
                 <DonutChart running={runningCount} available={availableCount} total={totalCount} />
               </div>
-              <div className="flex items-center justify-center gap-5 text-xs">
+              <div className="flex items-center justify-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
                   <span className="text-gray-600">Running ({runningCount})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
+                  <span className="w-2 h-2 rounded-full bg-gray-200" />
                   <span className="text-gray-600">Available ({availableCount})</span>
                 </div>
               </div>
             </div>
 
-            {/* Folders section - only visible for Admin */}
-            {isAdmin && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div
-                  className="flex items-center justify-between px-5 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group"
-                  onClick={() => onViewChange?.('folders')}
-                >
-                  <h2 className="text-base font-semibold text-gray-900">Folders</h2>
-                  <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                    View all <ChevronRight className="w-3.5 h-3.5" />
-                  </div>
+            {/* Folders section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col flex-1 min-h-0">
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+                onClick={() => onViewChange?.('folders')}
+              >
+                <h2 className="text-sm font-semibold text-gray-900">Folders</h2>
+                <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  View all <ChevronRight className="w-3.5 h-3.5" />
                 </div>
-                {folders.length > 0 ? (
-                  <div className="divide-y divide-gray-50">
-                    {folders.slice(0, 6).map((folder, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 px-5 py-3 hover:bg-orange-50/50 transition-colors cursor-pointer group"
-                        onClick={() => onSelectFolder?.(folder.id)}
-                      >
-                        <div className="w-7 h-7 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
-                          <FolderOpen className="w-3.5 h-3.5 text-orange-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-orange-700 transition-colors">
-                            {folder.name || `Folder ${index + 1}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-gray-400">{folder.profilesCount || 0}</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-orange-400 transition-colors" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 px-5">
-                    <FolderOpen className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs text-gray-400">No folders configured</p>
-                  </div>
-                )}
               </div>
-            )}
-
+              {folders.length > 0 ? (
+                <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                  {folders.slice(0, 10).map((folder, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2.5 px-4 py-2 hover:bg-orange-50/50 transition-colors cursor-pointer group"
+                      onClick={() => onSelectFolder?.(folder.id)}
+                    >
+                      <div className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
+                        <FolderOpen className="w-3 h-3 text-orange-600" />
+                      </div>
+                      <p className="text-xs font-medium text-gray-900 truncate flex-1 group-hover:text-orange-700 transition-colors">
+                        {folder.name || `Folder ${index + 1}`}
+                      </p>
+                      <span className="text-[10px] text-gray-400 flex-shrink-0">{folder.profilesCount || 0}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center px-4">
+                  <FolderOpen className="h-7 w-7 text-gray-300 mb-1.5" />
+                  <p className="text-xs text-gray-400">No folders</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* ─── Extend Proxy Modal ─── */}
+      {showExtendModal && extendProxyData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowExtendModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="relative px-6 py-5 bg-gradient-to-r from-orange-500 to-orange-600">
+              <button onClick={() => setShowExtendModal(false)} className="absolute right-4 top-4 text-white/80 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Clock className="w-5 h-5" /> Extend Proxy Period
+              </h2>
+              <p className="text-white/70 text-xs mt-0.5">Extend the validity period of your proxy</p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-orange-50 rounded-xl p-4 border-l-4 border-orange-400">
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Proxy ID</span>
+                    <span className="text-sm font-bold text-gray-900 font-mono">{extendProxyData.id || extendProxyData.proxy_id}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Public IP</span>
+                    <span className="text-sm font-semibold text-gray-800 font-mono">{extendProxyData.public_ip || extendProxyData.publicIp || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Expires</span>
+                    <span className="text-sm font-semibold text-amber-600">{formatExpiry(extendProxyData.expires_formatted || extendProxyData.expires_at || '')}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5 block">
+                  <Calendar className="w-3.5 h-3.5 text-orange-500" /> Extension Period
+                </label>
+                <select
+                  value={extendPeriod}
+                  onChange={(e) => { setExtendPeriod(parseInt(e.target.value)); setExtendPrice(null); }}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                >
+                  <option value={0}>Select extension period</option>
+                  <option value={1}>1 Month</option>
+                  <option value={2}>2 Months</option>
+                  <option value={3}>3 Months</option>
+                  <option value={6}>6 Months</option>
+                  <option value={12}>12 Months</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5 block">
+                  <Tag className="w-3.5 h-3.5 text-orange-500" /> Coupon Code (Optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={extendCoupon}
+                    onChange={(e) => setExtendCoupon(e.target.value)}
+                    className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    placeholder="Enter coupon code"
+                  />
+                  <button
+                    onClick={handleExtensionPrice}
+                    disabled={!extendPeriod || extendPriceLoading}
+                    className="flex items-center gap-1.5 px-3 py-2.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50"
+                  >
+                    {extendPriceLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Apply
+                  </button>
+                </div>
+              </div>
+              {extendPrice && (
+                <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-orange-700">Extension Cost:</span>
+                    <span className="text-lg font-bold text-orange-900">${extendPrice.price.toFixed(2)} {extendPrice.currency}</span>
+                  </div>
+                  <p className="text-[11px] text-orange-500 mt-1">For {extendPeriod} month{extendPeriod > 1 ? 's' : ''} extension</p>
+                </div>
+              )}
+              {extendPriceLoading && (
+                <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin text-orange-500" /> Calculating price...
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50/50">
+              <button onClick={() => setShowExtendModal(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
+              <button
+                onClick={handleExtendProxy}
+                disabled={extendLoading || !extendPeriod || !extendPrice}
+                className="flex items-center gap-1.5 px-5 py-2 text-sm text-white bg-orange-600 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {extendLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+                Extend Proxy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

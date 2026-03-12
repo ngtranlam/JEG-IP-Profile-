@@ -240,6 +240,56 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gologinSDKStopAllProfiles: () =>
     ipcRenderer.invoke('gologin-sdk:stop-all-profiles'),
 
+  // External Proxy Management
+  extProxyList: (filters?: { status?: string; search?: string; country?: string; network?: string; isp?: string; seller_username?: string }) =>
+    ipcRenderer.invoke('ext-proxy:list', filters),
+
+  extProxyStats: (sellerUsername?: string) =>
+    ipcRenderer.invoke('ext-proxy:stats', sellerUsername),
+
+  extProxyDetail: (proxyId: string) =>
+    ipcRenderer.invoke('ext-proxy:detail', proxyId),
+
+  extProxyOrderOptions: (serviceType?: string, planId?: string) =>
+    ipcRenderer.invoke('ext-proxy:order-options', serviceType, planId),
+
+  extProxyCalculatePrice: (orderData: any) =>
+    ipcRenderer.invoke('ext-proxy:calculate-price', orderData),
+
+  extProxyOrder: (orderData: any) =>
+    ipcRenderer.invoke('ext-proxy:order', orderData),
+
+  extProxySync: () =>
+    ipcRenderer.invoke('ext-proxy:sync'),
+
+  // v2 Write endpoints
+  extProxyUpdateNote: (proxyId: string, notes: string | null) =>
+    ipcRenderer.invoke('ext-proxy:update-note', proxyId, notes),
+
+  extProxyExtensionPrice: (proxyId: string, periodInMonths: number) =>
+    ipcRenderer.invoke('ext-proxy:extension-price', proxyId, periodInMonths),
+
+  extProxyExtend: (proxyId: string, periodInMonths: number, couponCode?: string) =>
+    ipcRenderer.invoke('ext-proxy:extend', proxyId, periodInMonths, couponCode),
+
+  extProxyAddManual: (data: any) =>
+    ipcRenderer.invoke('ext-proxy:add-manual', data),
+
+  extProxyUpdateManualExpiration: (proxyId: string, expiresAt: string) =>
+    ipcRenderer.invoke('ext-proxy:update-manual-expiration', proxyId, expiresAt),
+
+  extProxyChangeWhitelistedIps: (proxyId: string, ips: string[]) =>
+    ipcRenderer.invoke('ext-proxy:change-whitelisted-ips', proxyId, ips),
+
+  extProxySellers: () =>
+    ipcRenderer.invoke('ext-proxy:sellers'),
+
+  extProxyUpdateSeller: (proxyId: string, sellerUsername: string | null) =>
+    ipcRenderer.invoke('ext-proxy:update-seller', proxyId, sellerUsername),
+
+  extProxyDelete: (proxyId: string, reason?: string) =>
+    ipcRenderer.invoke('ext-proxy:delete', proxyId, reason),
+
   // Event listeners
   onBrowserClosed: (callback: (profileId: string) => void) => {
     const listener = (_event: any, profileId: string) => callback(profileId);
@@ -403,6 +453,26 @@ declare global {
       teamsRemoveMember: (teamId: number, userId: number) => Promise<void>;
       teamsGetMemberFolders: (teamId: number, userId: number) => Promise<any[]>;
       teamsSetMemberFolders: (teamId: number, userId: number, folderIds: string[]) => Promise<void>;
+      
+      // External Proxy Management methods
+      extProxyList: (filters?: { status?: string; search?: string; country?: string; network?: string; isp?: string; seller_username?: string }) => Promise<any>;
+      extProxyStats: (sellerUsername?: string) => Promise<any>;
+      extProxyDetail: (proxyId: string) => Promise<any>;
+      extProxyOrderOptions: (serviceType?: string, planId?: string) => Promise<any>;
+      extProxyCalculatePrice: (orderData: any) => Promise<any>;
+      extProxyOrder: (orderData: any) => Promise<any>;
+      extProxySync: () => Promise<any>;
+      
+      // v2 Write endpoints
+      extProxyUpdateNote: (proxyId: string, notes: string | null) => Promise<any>;
+      extProxyExtensionPrice: (proxyId: string, periodInMonths: number) => Promise<any>;
+      extProxyExtend: (proxyId: string, periodInMonths: number, couponCode?: string) => Promise<any>;
+      extProxyAddManual: (data: any) => Promise<any>;
+      extProxyUpdateManualExpiration: (proxyId: string, expiresAt: string) => Promise<any>;
+      extProxyChangeWhitelistedIps: (proxyId: string, ips: string[]) => Promise<any>;
+      extProxySellers: () => Promise<any>;
+      extProxyUpdateSeller: (proxyId: string, sellerUsername: string | null) => Promise<any>;
+      extProxyDelete: (proxyId: string, reason?: string) => Promise<any>;
       
       // GoLogin SDK methods
       gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') => Promise<any>;

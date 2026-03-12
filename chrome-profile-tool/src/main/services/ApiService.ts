@@ -673,6 +673,162 @@ export class ApiService {
     });
   }
 
+  // External Proxy Management methods (via PHP backend → jegdn.com API)
+  async getExternalProxyList(token: string, filters: { status?: string; search?: string; country?: string; network?: string; isp?: string; seller_username?: string } = {}): Promise<any> {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.country) params.append('country', filters.country);
+    if (filters.network) params.append('network', filters.network);
+    if (filters.isp) params.append('isp', filters.isp);
+    if (filters.seller_username) params.append('seller_username', filters.seller_username);
+    
+    const queryString = params.toString();
+    const endpoint = `/local_data/proxy_list${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await this.makeRequest(endpoint, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
+  async getExternalProxyStats(token: string, sellerUsername?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (sellerUsername) params.append('seller_username', sellerUsername);
+    
+    const queryString = params.toString();
+    const endpoint = `/local_data/proxy_stats${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await this.makeRequest(endpoint, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
+  async getExternalProxyDetail(token: string, proxyId: string): Promise<any> {
+    const response = await this.makeRequest(`/local_data/proxy_detail/${proxyId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
+  async getProxyOrderOptions(token: string, serviceType: string = 'static-residential-ipv4', planId: string = 'standard'): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_order_options', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ service_type: serviceType, plan_id: planId }),
+    });
+    return response.data;
+  }
+
+  async calculateProxyPrice(token: string, orderData: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_calculate_price', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(orderData),
+    });
+    return response.data;
+  }
+
+  async placeProxyOrder(token: string, orderData: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_order', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(orderData),
+    });
+    return response.data;
+  }
+
+  async syncExternalProxies(token: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_sync', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
+  // ===== v2 Write Endpoints =====
+
+  async updateProxyNote(token: string, proxyId: string, notes: string | null): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_update_note', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, notes }),
+    });
+    return response.data;
+  }
+
+  async getProxyExtensionPrice(token: string, proxyId: string, periodInMonths: number): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_extension_price', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, period_in_months: periodInMonths }),
+    });
+    return response.data;
+  }
+
+  async extendProxy(token: string, proxyId: string, periodInMonths: number, couponCode?: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_extend', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, period_in_months: periodInMonths, ...(couponCode ? { coupon_code: couponCode } : {}) }),
+    });
+    return response.data;
+  }
+
+  async addManualProxy(token: string, data: any): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_add_manual', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    return response.data;
+  }
+
+  async updateManualProxyExpiration(token: string, proxyId: string, expiresAt: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_update_manual_expiration', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, expires_at: expiresAt }),
+    });
+    return response.data;
+  }
+
+  async changeProxyWhitelistedIps(token: string, proxyId: string, ips: string[]): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_change_whitelisted_ips', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, ips }),
+    });
+    return response.data;
+  }
+
+  async getProxySellers(token: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_sellers', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
+  async updateProxySeller(token: string, proxyId: string, sellerUsername: string | null): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_update_seller', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, seller_username: sellerUsername }),
+    });
+    return response.data;
+  }
+
+  async deleteExternalProxy(token: string, proxyId: string, reason?: string): Promise<any> {
+    const response = await this.makeRequest('/local_data/proxy_delete', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ proxy_id: proxyId, ...(reason ? { reason } : {}) }),
+    });
+    return response.data;
+  }
+
   async changePassword(token: string, oldPassword: string, newPassword: string): Promise<void> {
     await this.makeRequest('/auth/change_password', {
       method: 'POST',

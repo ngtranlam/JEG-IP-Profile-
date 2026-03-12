@@ -460,6 +460,105 @@ class ChromeProfileTool {
       return await this.apiService.setMemberFolders(token, teamId, userId, folderIds);
     });
 
+    // External Proxy Management IPC handlers
+    ipcMain.handle('ext-proxy:list', async (_, filters) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getExternalProxyList(token, filters || {});
+    });
+
+    ipcMain.handle('ext-proxy:stats', async (_, sellerUsername) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getExternalProxyStats(token, sellerUsername);
+    });
+
+    ipcMain.handle('ext-proxy:detail', async (_, proxyId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getExternalProxyDetail(token, proxyId);
+    });
+
+    ipcMain.handle('ext-proxy:order-options', async (_, serviceType, planId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getProxyOrderOptions(token, serviceType, planId);
+    });
+
+    ipcMain.handle('ext-proxy:calculate-price', async (_, orderData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.calculateProxyPrice(token, orderData);
+    });
+
+    ipcMain.handle('ext-proxy:order', async (_, orderData) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.placeProxyOrder(token, orderData);
+    });
+
+    ipcMain.handle('ext-proxy:sync', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.syncExternalProxies(token);
+    });
+
+    // ===== v2 Write IPC handlers =====
+
+    ipcMain.handle('ext-proxy:update-note', async (_, proxyId, notes) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateProxyNote(token, proxyId, notes);
+    });
+
+    ipcMain.handle('ext-proxy:extension-price', async (_, proxyId, periodInMonths) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getProxyExtensionPrice(token, proxyId, periodInMonths);
+    });
+
+    ipcMain.handle('ext-proxy:extend', async (_, proxyId, periodInMonths, couponCode) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.extendProxy(token, proxyId, periodInMonths, couponCode);
+    });
+
+    ipcMain.handle('ext-proxy:add-manual', async (_, data) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.addManualProxy(token, data);
+    });
+
+    ipcMain.handle('ext-proxy:update-manual-expiration', async (_, proxyId, expiresAt) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateManualProxyExpiration(token, proxyId, expiresAt);
+    });
+
+    ipcMain.handle('ext-proxy:change-whitelisted-ips', async (_, proxyId, ips) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.changeProxyWhitelistedIps(token, proxyId, ips);
+    });
+
+    ipcMain.handle('ext-proxy:sellers', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getProxySellers(token);
+    });
+
+    ipcMain.handle('ext-proxy:update-seller', async (_, proxyId, sellerUsername) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateProxySeller(token, proxyId, sellerUsername);
+    });
+
+    ipcMain.handle('ext-proxy:delete', async (_, proxyId, reason) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.deleteExternalProxy(token, proxyId, reason);
+    });
+
     // Authentication IPC handlers
     ipcMain.handle('auth:login', async (_, userName, password) => {
       try {

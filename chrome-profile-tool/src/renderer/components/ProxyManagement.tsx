@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ShoppingCart, Filter, ChevronDown, Search, RefreshCw, Globe, X, Save, Trash2, Edit, Copy, ArrowLeft, Eye, EyeOff, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, ShoppingCart, Filter, ChevronDown, Search, RefreshCw, Globe, X, Save, Trash2, Edit, Copy, ArrowLeft, Eye, EyeOff, Check, Loader2, Clock, Tag, Calendar } from 'lucide-react';
 
 interface Proxy {
-  id: number;
+  id: string;
   proxyId: string;
+  displayId: string;
   name: string;
+  sellerFullName: string;
+  sellerUsername: string;
   publicIp: string;
   notes: string;
   network: string;
@@ -13,56 +16,142 @@ interface Proxy {
   monthlyCost: number;
   expires: string;
   status: 'active' | 'expiring' | 'inactive';
-  location?: string;
-  isp?: string;
-  username?: string;
-  password?: string;
-  connectIp?: string;
-  httpPort?: string;
+  location: string;
+  countryFlag: string;
+  isp: string;
+  username: string;
+  password: string;
+  connectIp: string;
+  httpPort: string;
+  httpsPort: string;
+  socks5Port: string;
+  bandwidth: string;
+  source: string;
+  isManual: boolean;
+}
+
+interface ProxyStats {
+  active: number;
+  expiring_soon: number;
+  inactive: number;
+  total: number;
+  total_monthly_cost: number;
+}
+
+interface OrderOptions {
+  countries: string[] | Record<string, string>;
+  isps: Record<string, { id: string; label?: string; name?: string }[]>;
+  plans: { id: string; name: string; description: string }[];
+}
+
+interface PriceData {
+  unitPrice: number;
+  unitPriceAfterDiscount: number;
+  totalPrice: number;
+  finalPrice: number;
+  discount: number;
+  discountPercentage: number;
+  currency: string;
 }
 
 interface ProxyManagementProps {
   currentUser?: any;
 }
 
-// Mock data for UI development
-const mockProxies: Proxy[] = [
-  { id: 1, proxyId: '1877575', name: 'Trần Đức Minh', publicIp: '166.88.179.81', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-12 03:06', status: 'active', location: 'US', isp: 'Comcast', username: 'BFCDlwI7vmigIn', password: 'proxy_pass_123', connectIp: '166.88.179.81', httpPort: '42359' },
-  { id: 2, proxyId: '1877572', name: '-', publicIp: '198.143.32.152', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 0.00, expires: '2026-06-12 03:02', status: 'active', location: 'US', isp: 'Verizon', username: 'user_572', password: 'pass_572', connectIp: '198.143.32.152', httpPort: '42360' },
-  { id: 3, proxyId: '1872604', name: '-', publicIp: '169.203.162.191', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 0.00, expires: '2026-04-10 07:38', status: 'expiring', location: 'UK', isp: 'BT', username: 'user_604', password: 'pass_604', connectIp: '169.203.162.191', httpPort: '42361' },
-  { id: 4, proxyId: '1872602', name: '-', publicIp: '82.39.67.93', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 0.00, expires: '2026-04-10 07:38', status: 'expiring', location: 'UK', isp: 'Virgin Media', username: 'user_602', password: 'pass_602', connectIp: '82.39.67.93', httpPort: '42362' },
-  { id: 5, proxyId: '1872600', name: 'Trần Đức Minh', publicIp: '185.203.139.163', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.41, expires: '2026-04-10 07:38', status: 'active', location: 'DE', isp: 'Deutsche Telekom', username: 'user_600', password: 'pass_600', connectIp: '185.203.139.163', httpPort: '42363' },
-  { id: 6, proxyId: '1872257', name: 'Nguyễn Đoan Thục Uyên', publicIp: '82.41.246.87', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-10 03:42', status: 'active', location: 'UK', isp: 'Sky', username: 'user_257', password: 'pass_257', connectIp: '82.41.246.87', httpPort: '42364' },
-  { id: 7, proxyId: '1872182', name: 'Lê Ngọc Phương Trinh', publicIp: '82.41.246.68', notes: 'acc etsy 12', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-10 02:49', status: 'active', location: 'UK', isp: 'Sky', username: 'user_182', password: 'pass_182', connectIp: '82.41.246.68', httpPort: '42365' },
-  { id: 8, proxyId: '1869943', name: 'Phạm Hữu Tuấn', publicIp: '82.39.69.28', notes: 'stephenmartin@theshiretailor.com UK', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-09 08:15', status: 'active', location: 'UK', isp: 'Virgin Media', username: 'user_943', password: 'pass_943', connectIp: '82.39.69.28', httpPort: '42366' },
-  { id: 9, proxyId: '1869536', name: 'Vương Khánh Hùng', publicIp: '178.92.61.37', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-09 04:19', status: 'active', location: 'UA', isp: 'Kyivstar', username: 'user_536', password: 'pass_536', connectIp: '178.92.61.37', httpPort: '42367' },
-  { id: 10, proxyId: '1869520', name: 'Nguyễn Phương Thảo', publicIp: '204.252.81.242', notes: 'Merch 8', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-05-09 04:05', status: 'active', location: 'US', isp: 'AT&T', username: 'user_520', password: 'pass_520', connectIp: '204.252.81.242', httpPort: '42368' },
-  { id: 11, proxyId: '1869515', name: 'Nguyễn Phương Thảo', publicIp: '204.252.83.33', notes: 'Merch 10', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-05-09 04:04', status: 'active', location: 'US', isp: 'AT&T', username: 'user_515', password: 'pass_515', connectIp: '204.252.83.33', httpPort: '42369' },
-  { id: 12, proxyId: '1869513', name: 'Nguyễn Phương Thảo', publicIp: '204.252.83.115', notes: 'Merch 17', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-05-09 04:02', status: 'active', location: 'US', isp: 'AT&T', username: 'user_513', password: 'pass_513', connectIp: '204.252.83.115', httpPort: '42370' },
-  { id: 13, proxyId: '1869512', name: 'Nguyễn Phương Thảo', publicIp: '204.252.86.178', notes: 'merch10_crockeryatt2000@outlook.com', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-05-09 03:59', status: 'active', location: 'US', isp: 'Comcast', username: 'user_512', password: 'pass_512', connectIp: '204.252.86.178', httpPort: '42371' },
-  { id: 14, proxyId: '1869506', name: 'Nguyễn Phương Thảo', publicIp: '204.252.85.37', notes: 'Merch 5', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-05-09 03:57', status: 'active', location: 'US', isp: 'Comcast', username: 'user_506', password: 'pass_506', connectIp: '204.252.85.37', httpPort: '42372' },
-  { id: 15, proxyId: '1869451', name: 'Trần Nhật Hoàng', publicIp: '187.189.172.13', notes: '-', network: 'STATIC RESIDENTIAL', ipVersion: 'IPv4', connectionType: 'HTTP', monthlyCost: 3.59, expires: '2026-04-09 03:35', status: 'inactive', location: 'MX', isp: 'Totalplay', username: 'user_451', password: 'pass_451', connectIp: '187.189.172.13', httpPort: '42373' },
-];
-
-const countryFlags: Record<string, string> = {
-  'US': '🇺🇸', 'UK': '🇬🇧', 'DE': '🇩🇪', 'FR': '🇫🇷', 'UA': '🇺🇦', 'MX': '🇲🇽',
-  'CA': '🇨🇦', 'AU': '🇦🇺', 'JP': '🇯🇵', 'BR': '🇧🇷', 'IN': '🇮🇳', 'VN': '🇻🇳',
+const countryNames: Record<string, string> = {
+  'US': 'United States', 'UK': 'United Kingdom', 'GB': 'United Kingdom', 'DE': 'Germany', 'FR': 'France',
+  'UA': 'Ukraine', 'MX': 'Mexico', 'CA': 'Canada', 'AU': 'Australia', 'JP': 'Japan',
+  'BR': 'Brazil', 'IN': 'India', 'VN': 'Vietnam', 'IT': 'Italy', 'ES': 'Spain',
+  'NL': 'Netherlands', 'PL': 'Poland', 'PT': 'Portugal', 'SE': 'Sweden', 'NO': 'Norway',
+  'DK': 'Denmark', 'FI': 'Finland', 'AT': 'Austria', 'CH': 'Switzerland', 'BE': 'Belgium',
+  'IE': 'Ireland', 'CZ': 'Czech Republic', 'RO': 'Romania', 'HU': 'Hungary', 'GR': 'Greece',
+  'TR': 'Turkey', 'ZA': 'South Africa', 'KR': 'South Korea', 'TW': 'Taiwan', 'SG': 'Singapore',
+  'HK': 'Hong Kong', 'TH': 'Thailand', 'PH': 'Philippines', 'ID': 'Indonesia', 'MY': 'Malaysia',
+  'AR': 'Argentina', 'CL': 'Chile', 'CO': 'Colombia', 'PE': 'Peru', 'IL': 'Israel',
+  'AE': 'United Arab Emirates', 'SA': 'Saudi Arabia', 'EG': 'Egypt', 'NG': 'Nigeria',
+  'KE': 'Kenya', 'PK': 'Pakistan', 'BD': 'Bangladesh', 'RU': 'Russia', 'BG': 'Bulgaria',
+  'HR': 'Croatia', 'SK': 'Slovakia', 'SI': 'Slovenia', 'LT': 'Lithuania', 'LV': 'Latvia',
+  'EE': 'Estonia', 'RS': 'Serbia', 'BA': 'Bosnia', 'AL': 'Albania', 'MK': 'North Macedonia',
+  'GE': 'Georgia', 'AM': 'Armenia', 'AZ': 'Azerbaijan', 'KZ': 'Kazakhstan', 'UZ': 'Uzbekistan',
+  'NZ': 'New Zealand', 'PR': 'Puerto Rico', 'CR': 'Costa Rica', 'PA': 'Panama', 'EC': 'Ecuador',
+  'UY': 'Uruguay', 'PY': 'Paraguay', 'BO': 'Bolivia', 'DO': 'Dominican Republic', 'GT': 'Guatemala',
 };
 
+const countryFlags: Record<string, string> = {
+  'US': '🇺🇸', 'UK': '🇬🇧', 'GB': '🇬🇧', 'DE': '🇩🇪', 'FR': '🇫🇷', 'UA': '🇺🇦', 'MX': '🇲🇽',
+  'CA': '🇨🇦', 'AU': '🇦🇺', 'JP': '🇯🇵', 'BR': '🇧🇷', 'IN': '🇮🇳', 'VN': '🇻🇳',
+  'IT': '🇮🇹', 'ES': '🇪🇸', 'NL': '🇳🇱', 'PL': '🇵🇱', 'PT': '🇵🇹', 'SE': '🇸🇪',
+  'NO': '🇳🇴', 'DK': '🇩🇰', 'FI': '🇫🇮', 'AT': '🇦🇹', 'CH': '🇨🇭', 'BE': '🇧🇪',
+  'IE': '🇮🇪', 'CZ': '🇨🇿', 'RO': '🇷🇴', 'HU': '🇭🇺', 'GR': '🇬🇷', 'TR': '🇹🇷',
+  'ZA': '🇿🇦', 'KR': '🇰🇷', 'TW': '🇹🇼', 'SG': '🇸🇬', 'HK': '🇭🇰', 'TH': '🇹🇭',
+  'PH': '🇵🇭', 'ID': '🇮🇩', 'MY': '🇲🇾', 'AR': '🇦🇷', 'CL': '🇨🇱', 'CO': '🇨🇴',
+  'PE': '🇵🇪', 'IL': '🇮🇱', 'AE': '🇦🇪', 'SA': '🇸🇦', 'EG': '🇪🇬', 'NG': '🇳🇬',
+  'KE': '🇰🇪', 'PK': '🇵🇰', 'BD': '🇧🇩', 'RU': '🇷🇺', 'NZ': '🇳🇿',
+};
+
+function mapApiStatus(rawStatus: string): 'active' | 'expiring' | 'inactive' {
+  const s = rawStatus?.toUpperCase();
+  if (s === 'ACTIVE') return 'active';
+  if (s === 'EXPIRING_SOON' || s === 'EXPIRING') return 'expiring';
+  return 'inactive';
+}
+
+function mapApiProxy(p: any): Proxy {
+  return {
+    id: p.id || p.proxy_id || '',
+    proxyId: p.id || p.proxy_id || '',
+    displayId: p.display_id || p.id || '',
+    name: p.name || '-',
+    sellerFullName: p.seller_full_name || p.name || '-',
+    sellerUsername: p.seller_username || p.name || '',
+    publicIp: p.public_ip || '',
+    notes: p.notes || '-',
+    network: p.network_type || 'STATIC RESIDENTIAL',
+    ipVersion: p.ip_version || 'IPv4',
+    connectionType: p.proxy_type || 'HTTP',
+    monthlyCost: parseFloat(p.monthly_cost_raw ?? p.monthly_cost ?? 0),
+    expires: p.expires_formatted || p.expires_at || '',
+    status: mapApiStatus(p.status || p.raw_status || ''),
+    location: p.country_code || '',
+    countryFlag: p.country_flag || countryFlags[p.country_code] || '',
+    isp: p.isp_name || '',
+    username: p.username || '',
+    password: p.password || '',
+    connectIp: p.connect_ip || p.public_ip || '',
+    httpPort: p.http_port || '',
+    httpsPort: p.https_port || '',
+    socks5Port: p.socks5_port || '',
+    bandwidth: p.bandwidth || 'Unlimited',
+    source: p.source || 'api',
+    isManual: p.is_manual || false,
+  };
+}
+
 export function ProxyManagement({ currentUser }: ProxyManagementProps) {
-  const [proxies, setProxies] = useState<Proxy[]>(mockProxies);
-  const [loading, setLoading] = useState(false);
+  const [proxies, setProxies] = useState<Proxy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'expiring' | 'inactive'>('active');
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'cost_high' | 'cost_low'>('newest');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showActionMenu, setShowActionMenu] = useState<number | null>(null);
+  const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedProxy, setSelectedProxy] = useState<Proxy | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [quickInput, setQuickInput] = useState('');
+  // Add Proxy modal fields
+  const [addProxyIp, setAddProxyIp] = useState('');
+  const [addProxyPort, setAddProxyPort] = useState('');
+  const [addProxyUsername, setAddProxyUsername] = useState('');
+  const [addProxyPassword, setAddProxyPassword] = useState('');
+  const [addProxyLocation, setAddProxyLocation] = useState('');
+  const [addProxyIsp, setAddProxyIsp] = useState('');
+  const [addProxyExpires, setAddProxyExpires] = useState('');
+  const [addProxyHttpPort, setAddProxyHttpPort] = useState('');
+  const [addProxyNotes, setAddProxyNotes] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterNetwork, setFilterNetwork] = useState('all');
   const [filterIpVersion, setFilterIpVersion] = useState('all');
@@ -72,12 +161,118 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
   const [filterIsp, setFilterIsp] = useState('all');
   const [filterCountry, setFilterCountry] = useState('all');
   const [filterSeller, setFilterSeller] = useState('all');
+  const [sellersList, setSellersList] = useState<{id: number; userName: string; fullName: string}[]>([]);
+
+  // Notes editing state
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteValue, setEditingNoteValue] = useState('');
+
+  // Extend modal state
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendProxy, setExtendProxy] = useState<Proxy | null>(null);
+  const [extendPeriod, setExtendPeriod] = useState(0);
+  const [extendCoupon, setExtendCoupon] = useState('');
+  const [extendPrice, setExtendPrice] = useState<{price: number; currency: string} | null>(null);
+  const [extendPriceLoading, setExtendPriceLoading] = useState(false);
+  const [extendLoading, setExtendLoading] = useState(false);
+
+  // Stats from API
+  const [stats, setStats] = useState<ProxyStats>({ active: 0, expiring_soon: 0, inactive: 0, total: 0, total_monthly_cost: 0 });
+
+  // Order modal state
+  const [orderOptions, setOrderOptions] = useState<OrderOptions | null>(null);
+  const [orderCountry, setOrderCountry] = useState('US');
+  const [orderIsp, setOrderIsp] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState(1);
+  const [orderDuration, setOrderDuration] = useState(1);
+  const [orderCoupon, setOrderCoupon] = useState('');
+  const [priceData, setPriceData] = useState<PriceData | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [priceLoading, setPriceLoading] = useState(false);
 
   const sortRef = useRef<HTMLDivElement>(null);
   const actionRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = currentUser?.roles === '1';
   const isLeader = currentUser?.roles === '2';
+
+  // Fetch proxy list from API
+  const fetchProxies = useCallback(async (statusFilter?: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const filters: any = {};
+      const tabStatus = statusFilter || activeTab;
+      if (tabStatus === 'active') filters.status = 'active';
+      else if (tabStatus === 'expiring') filters.status = 'expiring_soon';
+      else if (tabStatus === 'inactive') filters.status = 'inactive';
+
+      if (searchTerm) filters.search = searchTerm;
+      if (filterCountry !== 'all') filters.country = filterCountry;
+      if (filterNetwork !== 'all') filters.network = filterNetwork;
+      if (filterIsp !== 'all') filters.isp = filterIsp;
+      if (isAdmin && filterSeller !== 'all') filters.seller_username = filterSeller;
+
+      const result = await window.electronAPI.extProxyList(filters);
+      const apiProxies = result?.proxies || result || [];
+      setProxies(Array.isArray(apiProxies) ? apiProxies.map(mapApiProxy) : []);
+    } catch (err: any) {
+      console.error('Failed to fetch proxies:', err);
+      setError(err.message || 'Failed to load proxies');
+      setProxies([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, searchTerm, filterCountry, filterNetwork, filterIsp, filterSeller, isAdmin]);
+
+  // Fetch stats from API
+  const fetchStats = useCallback(async () => {
+    try {
+      const sellerUsername = isAdmin && filterSeller !== 'all' ? filterSeller : undefined;
+      const result = await window.electronAPI.extProxyStats(sellerUsername);
+      if (result) {
+        setStats({
+          active: result.active || 0,
+          expiring_soon: result.expiring_soon || 0,
+          inactive: result.inactive || 0,
+          total: result.total || 0,
+          total_monthly_cost: result.total_monthly_cost || 0,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+  }, [isAdmin, filterSeller]);
+
+  // Auto-sync on page load, then fetch
+  useEffect(() => {
+    const initLoad = async () => {
+      try {
+        await window.electronAPI.extProxySync();
+      } catch (err) {
+        console.error('Auto-sync failed:', err);
+      }
+      fetchProxies();
+      fetchStats();
+      // Fetch sellers list for admin filter
+      if (isAdmin) {
+        try {
+          const sellers = await window.electronAPI.extProxySellers() as any;
+          console.log('[Sellers] Raw:', sellers);
+          const raw = Array.isArray(sellers) ? sellers : sellers?.data || [];
+          const list = raw.map((s: any) => ({
+            id: s.id || 0,
+            userName: s.userName || s.username || '',
+            fullName: s.fullName || s.full_name || s.name || s.userName || '',
+          }));
+          setSellersList(list);
+        } catch (err) {
+          console.error('Failed to fetch sellers:', err);
+        }
+      }
+    };
+    initLoad();
+  }, [fetchProxies, fetchStats, isAdmin]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -104,47 +299,33 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
     setFilterSeller('all');
   };
 
+
   const uniqueIsps = [...new Set(proxies.map(p => p.isp).filter(Boolean))];
   const uniqueCountries = [...new Set(proxies.map(p => p.location).filter(Boolean))];
-  const uniqueSellers = [...new Set(proxies.map(p => p.name).filter(n => n && n !== '-'))];
 
+  // Client-side filtering for fields not supported by API
   const filteredProxies = proxies.filter(p => {
-    if (p.status !== activeTab) return false;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      if (!(
-        p.proxyId.toLowerCase().includes(term) ||
-        p.name.toLowerCase().includes(term) ||
-        p.publicIp.toLowerCase().includes(term) ||
-        p.notes.toLowerCase().includes(term)
-      )) return false;
-    }
-    if (filterNetwork !== 'all' && p.network !== filterNetwork) return false;
     if (filterIpVersion !== 'all' && p.ipVersion !== filterIpVersion) return false;
     if (filterConnectionType !== 'all' && p.connectionType !== filterConnectionType) return false;
-    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
-    if (filterIsp !== 'all' && p.isp !== filterIsp) return false;
-    if (filterCountry !== 'all' && p.location !== filterCountry) return false;
-    if (filterSeller !== 'all' && p.name !== filterSeller) return false;
     return true;
   });
 
   const sortedProxies = [...filteredProxies].sort((a, b) => {
     switch (sortOrder) {
-      case 'newest': return b.id - a.id;
-      case 'oldest': return a.id - b.id;
+      case 'newest': return parseInt(b.proxyId) - parseInt(a.proxyId);
+      case 'oldest': return parseInt(a.proxyId) - parseInt(b.proxyId);
       case 'cost_high': return b.monthlyCost - a.monthlyCost;
       case 'cost_low': return a.monthlyCost - b.monthlyCost;
       default: return 0;
     }
   });
 
-  const activeCount = proxies.filter(p => p.status === 'active').length;
-  const expiringCount = proxies.filter(p => p.status === 'expiring').length;
-  const inactiveCount = proxies.filter(p => p.status === 'inactive').length;
-  const totalMonthlyCost = proxies.reduce((sum, p) => sum + p.monthlyCost, 0);
+  const activeCount = stats.active;
+  const expiringCount = stats.expiring_soon;
+  const inactiveCount = stats.inactive;
+  const totalMonthlyCost = stats.total_monthly_cost;
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -185,9 +366,376 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
     navigator.clipboard.writeText(text);
   };
 
-  if (loading) {
+  // Tab change handler
+  const handleTabChange = (tab: 'active' | 'expiring' | 'inactive') => {
+    setActiveTab(tab);
+    setSelectedIds(new Set());
+  };
+
+  // Order modal: fetch order options
+  const openOrderModal = async () => {
+    setShowOrderModal(true);
+    setPriceData(null);
+    setOrderCountry('');
+    setOrderIsp('');
+    setOrderQuantity(1);
+    setOrderDuration(1);
+    setOrderCoupon('');
+    setOrderOptions(null);
+    try {
+      const result = await window.electronAPI.extProxyOrderOptions('static-residential-ipv4', 'standard');
+      console.log('[OrderOptions] Raw API response:', JSON.stringify(result, null, 2));
+      // Normalize the response - API may return data directly or nested
+      const data = result?.data || result;
+      const normalized: OrderOptions = {
+        countries: data?.countries || {},
+        isps: data?.isps || {},
+        plans: data?.plans || [],
+      };
+      console.log('[OrderOptions] Normalized:', JSON.stringify(normalized, null, 2));
+      setOrderOptions(normalized);
+      // Auto-select first country if available
+      const countryKeys = Object.keys(normalized.countries);
+      if (countryKeys.length > 0) {
+        setOrderCountry(countryKeys[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load order options:', err);
+    }
+  };
+
+  // Order modal: calculate price
+  const handleCalculatePrice = async () => {
+    try {
+      setPriceLoading(true);
+      const result = await window.electronAPI.extProxyCalculatePrice({
+        service_type: 'static-residential-ipv4',
+        plan_id: 'standard',
+        quantity: orderQuantity,
+        duration: orderDuration,
+        country: orderCountry,
+        ...(orderIsp ? { isp_id: orderIsp } : {}),
+        ...(orderCoupon ? { coupon_code: orderCoupon } : {}),
+      });
+      console.log('[CalculatePrice] Raw API response:', JSON.stringify(result, null, 2));
+      // Normalize - API may return data nested or with different field names
+      const data = result?.data || result;
+      const normalized: PriceData = {
+        unitPrice: parseFloat(data?.unit_price ?? data?.unitPrice ?? 0),
+        unitPriceAfterDiscount: parseFloat(data?.unit_price_after_discount ?? data?.unitPriceAfterDiscount ?? 0),
+        totalPrice: parseFloat(data?.total_price ?? data?.totalPrice ?? 0),
+        finalPrice: parseFloat(data?.final_price ?? data?.finalPrice ?? data?.total ?? 0),
+        discount: parseFloat(data?.discount ?? data?.discount_amount ?? 0),
+        discountPercentage: parseFloat(data?.discount_percentage ?? data?.discountPercentage ?? 0),
+        currency: data?.currency || 'USD',
+      };
+      console.log('[CalculatePrice] Normalized:', normalized);
+      setPriceData(normalized);
+    } catch (err) {
+      console.error('Failed to calculate price:', err);
+    } finally {
+      setPriceLoading(false);
+    }
+  };
+
+  // Auto-parse Quick Input for Add Proxy modal
+  useEffect(() => {
+    if (!quickInput.trim()) return;
+    
+    // Parse format: IP:Port:Username:Password
+    const parts = quickInput.trim().split(':');
+    if (parts.length >= 4) {
+      setAddProxyIp(parts[0]);
+      setAddProxyPort(parts[1]);
+      setAddProxyUsername(parts[2]);
+      setAddProxyPassword(parts.slice(3).join(':')); // In case password contains ':'
+      setAddProxyHttpPort(parts[1]); // Use same port for HTTP by default
+    } else if (parts.length === 2) {
+      // Just IP:Port
+      setAddProxyIp(parts[0]);
+      setAddProxyPort(parts[1]);
+      setAddProxyHttpPort(parts[1]);
+    }
+  }, [quickInput]);
+
+  // Auto-calculate price when order params change
+  useEffect(() => {
+    if (!showOrderModal || !orderCountry) return;
+    const timer = setTimeout(() => {
+      handleCalculatePrice();
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderCountry, orderIsp, orderQuantity, orderDuration, showOrderModal]);
+
+  // Order modal: place order
+  const handlePlaceOrder = async () => {
+    if (!confirm('This will place a real order and charge your account. Continue?')) return;
+    try {
+      setOrderLoading(true);
+      await window.electronAPI.extProxyOrder({
+        service_type: 'static-residential-ipv4',
+        plan_id: 'standard',
+        quantity: orderQuantity,
+        duration: orderDuration,
+        country: orderCountry,
+        ...(orderIsp ? { isp_id: orderIsp } : {}),
+        ...(orderCoupon ? { coupon_code: orderCoupon } : {}),
+      });
+      setShowOrderModal(false);
+      // Sync and refresh after order
+      try { await window.electronAPI.extProxySync(); } catch (_) {}
+      await Promise.all([fetchProxies(), fetchStats()]);
+    } catch (err: any) {
+      alert(err.message || 'Order failed');
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  // Add manual proxy via external API (v2)
+  const handleAddManualProxy = async () => {
+    if (!addProxyIp || !addProxyPort || !addProxyUsername || !addProxyPassword) {
+      alert('Please fill in all required fields (Connect IP, Port, Username, Password)');
+      return;
+    }
+    try {
+      const data: any = {
+        location: addProxyLocation || 'US',
+        isp: addProxyIsp || 'Unknown',
+        expires: addProxyExpires ? addProxyExpires.split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        connect_ip: addProxyIp,
+        proxy_username: addProxyUsername,
+        proxy_password: addProxyPassword,
+        http_port: parseInt(addProxyHttpPort || addProxyPort) || 8080,
+      };
+      if (addProxyNotes) data.notes = addProxyNotes;
+      
+      await window.electronAPI.extProxyAddManual(data);
+      setShowAddModal(false);
+      // Reset fields
+      setQuickInput(''); setAddProxyIp(''); setAddProxyPort(''); setAddProxyUsername(''); setAddProxyPassword('');
+      setAddProxyLocation(''); setAddProxyIsp(''); setAddProxyExpires(''); setAddProxyHttpPort(''); setAddProxyNotes('');
+      // Refresh list
+      try { await window.electronAPI.extProxySync(); } catch (_) {}
+      await Promise.all([fetchProxies(), fetchStats()]);
+    } catch (err: any) {
+      alert(err.message || 'Failed to add manual proxy');
+    }
+  };
+
+  // Update proxy note via external API (v2)
+  const handleUpdateNote = async (proxyId: string, notes: string) => {
+    try {
+      await window.electronAPI.extProxyUpdateNote(proxyId, notes);
+      // Update local state
+      setProxies(prev => prev.map(p => p.proxyId === proxyId ? { ...p, notes } : p));
+      if (selectedProxy && selectedProxy.proxyId === proxyId) {
+        setSelectedProxy({ ...selectedProxy, notes });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update note');
+    }
+  };
+
+  // Open extend modal for a proxy
+  const openExtendModal = (proxy: Proxy) => {
+    setExtendProxy(proxy);
+    setExtendPeriod(0);
+    setExtendCoupon('');
+    setExtendPrice(null);
+    setShowExtendModal(true);
+  };
+
+  // Fetch extension price
+  const handleExtensionPrice = async () => {
+    if (!extendProxy || !extendPeriod) return;
+    try {
+      setExtendPriceLoading(true);
+      const result = await window.electronAPI.extProxyExtensionPrice(extendProxy.proxyId, extendPeriod);
+      console.log('[ExtendPrice] Raw result:', JSON.stringify(result));
+      // Handle nested data: API returns finalPrice, priceNoDiscounts, unitPrice, etc.
+      const inner = result?.data ?? result;
+      const price = parseFloat(inner?.finalPrice ?? inner?.price ?? inner?.total_price ?? 0);
+      const currency = inner?.currency || inner?.priceInCurrency || 'USD';
+      const discount = parseFloat(inner?.discount ?? 0);
+      const priceNoDiscounts = parseFloat(inner?.priceNoDiscounts ?? 0);
+      console.log('[ExtendPrice] Parsed:', { price, currency, discount, priceNoDiscounts });
+      setExtendPrice({ price, currency });
+    } catch (err: any) {
+      console.error('Failed to get extension price:', err);
+      alert('Failed to calculate extension price: ' + (err.message || 'Unknown error'));
+      setExtendPrice(null);
+    } finally {
+      setExtendPriceLoading(false);
+    }
+  };
+
+  // Auto-fetch extension price when period changes
+  useEffect(() => {
+    if (!showExtendModal || !extendProxy || !extendPeriod) return;
+    const timer = setTimeout(() => {
+      handleExtensionPrice();
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extendPeriod, showExtendModal]);
+
+  // Execute extend proxy
+  const handleExtendProxy = async () => {
+    if (!extendProxy || !extendPeriod) return;
+    if (!confirm(`This will extend proxy ${extendProxy.proxyId} by ${extendPeriod} month(s) and charge $${extendPrice?.price?.toFixed(2) || '?'}. Continue?`)) return;
+    try {
+      setExtendLoading(true);
+      await window.electronAPI.extProxyExtend(extendProxy.proxyId, extendPeriod, extendCoupon || undefined);
+      setShowExtendModal(false);
+      // Refresh list
+      await Promise.all([fetchProxies(), fetchStats()]);
+    } catch (err: any) {
+      alert(err.message || 'Failed to extend proxy');
+    } finally {
+      setExtendLoading(false);
+    }
+  };
+
+  // Delete proxy via external API (v2, Admin only)
+  const handleDeleteProxy = async (proxyId: string) => {
+    if (!confirm('Are you sure you want to delete this proxy? This action is irreversible.')) return;
+    try {
+      await window.electronAPI.extProxyDelete(proxyId);
+      setSelectedProxy(null);
+      await Promise.all([fetchProxies(), fetchStats()]);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete proxy');
+    }
+  };
+
+  // ─── Extend Proxy Modal (shared between list & detail views) ───
+  const renderExtendModal = () => {
+    if (!showExtendModal || !extendProxy) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowExtendModal(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="relative px-6 py-5 bg-gradient-to-r from-orange-500 to-orange-600">
+            <button onClick={() => setShowExtendModal(false)} className="absolute right-4 top-4 text-white/80 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5" /> Extend Proxy Period
+            </h2>
+            <p className="text-white/70 text-xs mt-0.5">Extend the validity period of your proxy</p>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {/* Proxy Info */}
+            <div className="bg-orange-50 rounded-xl p-4 border-l-4 border-orange-400">
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Proxy ID</span>
+                  <span className="text-sm font-bold text-gray-900 font-mono">{extendProxy.proxyId}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Current Expires</span>
+                  <span className="text-sm font-semibold text-gray-800">{extendProxy.expires || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Status</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    extendProxy.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                    extendProxy.status === 'expiring' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {extendProxy.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Extension Period */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5 block">
+                <Calendar className="w-3.5 h-3.5 text-orange-500" /> Extension Period
+              </label>
+              <select
+                value={extendPeriod}
+                onChange={(e) => { setExtendPeriod(parseInt(e.target.value)); setExtendPrice(null); }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+              >
+                <option value={0}>Select extension period</option>
+                <option value={1}>1 Month</option>
+                <option value={2}>2 Months</option>
+                <option value={3}>3 Months</option>
+                <option value={6}>6 Months</option>
+                <option value={12}>12 Months</option>
+              </select>
+            </div>
+
+            {/* Coupon Code */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5 block">
+                <Tag className="w-3.5 h-3.5 text-orange-500" /> Coupon Code (Optional)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={extendCoupon}
+                  onChange={(e) => setExtendCoupon(e.target.value)}
+                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Enter coupon code"
+                />
+                <button
+                  onClick={handleExtensionPrice}
+                  disabled={!extendPeriod || extendPriceLoading}
+                  className="flex items-center gap-1.5 px-3 py-2.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50"
+                >
+                  {extendPriceLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Apply
+                </button>
+              </div>
+            </div>
+
+            {/* Price Display */}
+            {extendPrice && (
+              <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-orange-700">Extension Cost:</span>
+                  <span className="text-lg font-bold text-orange-900">${extendPrice.price.toFixed(2)} {extendPrice.currency}</span>
+                </div>
+                <p className="text-[11px] text-orange-500 mt-1">For {extendPeriod} month{extendPeriod > 1 ? 's' : ''} extension</p>
+              </div>
+            )}
+
+            {/* Loading indicator */}
+            {extendPriceLoading && (
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                Calculating price...
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50/50">
+            <button onClick={() => setShowExtendModal(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
+            <button
+              onClick={handleExtendProxy}
+              disabled={extendLoading || !extendPeriod || !extendPrice}
+              className="flex items-center gap-1.5 px-5 py-2 text-sm text-white bg-orange-600 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {extendLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+              Extend Proxy
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && proxies.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-orange-500 mr-2" />
         <div className="text-gray-500">Loading proxies...</div>
       </div>
     );
@@ -282,8 +830,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                 </div>
               </div>
 
-              <button className="w-full mt-6 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors">
-                <RefreshCw className="w-4 h-4" />
+              <button onClick={() => openExtendModal(p)} className="w-full mt-6 flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors">
+                <Clock className="w-4 h-4" />
                 Extend Proxy
               </button>
             </div>
@@ -373,6 +921,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
             </div>
           </div>
         </div>
+        {/* Extend Modal (rendered inside detail view) */}
+        {renderExtendModal()}
       </div>
     );
   }
@@ -398,7 +948,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                 Add Proxy
               </button>
               <button
-                onClick={() => setShowOrderModal(true)}
+                onClick={openOrderModal}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-xs font-medium"
               >
                 <ShoppingCart className="w-3.5 h-3.5" />
@@ -413,7 +963,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
       <div className="flex items-center justify-between px-6 py-2.5 border-b bg-gray-50/50">
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setActiveTab('active')}
+            onClick={() => handleTabChange('active')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               activeTab === 'active'
                 ? 'bg-green-50 text-green-700 border border-green-200'
@@ -426,7 +976,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
             }`}>{activeCount}</span>
           </button>
           <button
-            onClick={() => setActiveTab('expiring')}
+            onClick={() => handleTabChange('expiring')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               activeTab === 'expiring'
                 ? 'bg-orange-50 text-orange-700 border border-orange-200'
@@ -439,7 +989,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
             }`}>{expiringCount}</span>
           </button>
           <button
-            onClick={() => setActiveTab('inactive')}
+            onClick={() => handleTabChange('inactive')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               activeTab === 'inactive'
                 ? 'bg-red-50 text-red-700 border border-red-200'
@@ -492,6 +1042,14 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="px-6 py-2 bg-red-50 border-b border-red-200 flex items-center justify-between">
+          <span className="text-xs text-red-600">{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
 
       {/* Filter Panel */}
       {showFilters && (
@@ -581,25 +1139,27 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-4">
-            {/* Seller */}
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Seller</label>
-              <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                <option value="all">All Sellers</option>
-                {uniqueSellers.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+          {isAdmin && (
+            <div className="grid grid-cols-4 gap-4">
+              {/* Seller - Admin only */}
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Seller</label>
+                <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
+                  <option value="all">All Sellers</option>
+                  {sellersList.map((s) => (
+                    <option key={s.userName} value={s.userName}>{s.fullName || s.userName}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center justify-between pt-2 border-t border-gray-100">
             <span className="text-xs text-gray-500">{sortedProxies.length} result(s)</span>
             <div className="flex items-center gap-2">
-              <button onClick={clearAllFilters} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+              <button onClick={() => { clearAllFilters(); fetchProxies(); fetchStats(); }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
                 Clear all filters
               </button>
-              <button onClick={() => setShowFilters(false)} className="px-4 py-1.5 text-xs bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">
+              <button onClick={() => { setShowFilters(false); fetchProxies(); fetchStats(); }} className="px-4 py-1.5 text-xs bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">
                 Search
               </button>
             </div>
@@ -625,7 +1185,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <input type="checkbox" checked={selectedIds.size === sortedProxies.length && sortedProxies.length > 0} onChange={toggleSelectAll} className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500" />
                 </th>
                 <th className="w-[90px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Proxy ID</th>
-                <th className="w-[130px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Name</th>
+                {isAdmin && <th className="w-[130px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Name</th>}
                 <th className="w-[140px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Public IP</th>
                 <th className="w-[160px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Notes</th>
                 <th className="w-[100px] px-2 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase">Network</th>
@@ -649,14 +1209,16 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                     <input type="checkbox" checked={selectedIds.has(proxy.id)} onChange={() => toggleSelect(proxy.id)} className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500" />
                   </td>
                   <td className="px-2 py-2.5">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${proxy.status === 'active' ? 'bg-green-500' : proxy.status === 'expiring' ? 'bg-orange-400' : 'bg-red-500'}`} />
-                      <span className="text-xs font-medium text-gray-900">{proxy.proxyId}</span>
+                      <span className="text-xs font-medium text-gray-900 truncate" title={proxy.proxyId}>{proxy.proxyId}</span>
                     </div>
                   </td>
-                  <td className="px-2 py-2.5">
-                    <span className="text-xs text-gray-700 truncate block">{proxy.name}</span>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-2 py-2.5">
+                      <span className="text-xs text-gray-700 truncate block">{proxy.sellerFullName}</span>
+                    </td>
+                  )}
                   <td className="px-2 py-2.5">
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-mono text-orange-600 font-medium">{proxy.publicIp}</span>
@@ -665,12 +1227,43 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                       </button>
                     </div>
                   </td>
-                  <td className="px-2 py-2.5">
-                    <span className="text-xs text-gray-500 truncate block">{proxy.notes}</span>
+                  <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                    {editingNoteId === proxy.proxyId ? (
+                      <input
+                        type="text"
+                        value={editingNoteValue}
+                        onChange={(e) => setEditingNoteValue(e.target.value)}
+                        onBlur={async () => {
+                          await handleUpdateNote(proxy.proxyId, editingNoteValue);
+                          setEditingNoteId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          } else if (e.key === 'Escape') {
+                            setEditingNoteId(null);
+                          }
+                        }}
+                        autoFocus
+                        className="w-full px-2 py-1 text-xs border border-orange-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+                        placeholder="Add note..."
+                      />
+                    ) : (
+                      <span
+                        onClick={() => {
+                          setEditingNoteId(proxy.proxyId);
+                          setEditingNoteValue(proxy.notes || '');
+                        }}
+                        className="text-xs text-gray-500 truncate block cursor-text hover:text-gray-700 transition-colors"
+                        title="Click to edit note"
+                      >
+                        {proxy.notes || <span className="text-gray-400 italic">Add note...</span>}
+                      </span>
+                    )}
                   </td>
                   <td className="px-2 py-2.5">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
-                      STATIC RESIDENTIAL
+                      {proxy.network}
                     </span>
                   </td>
                   <td className="px-2 py-2.5">
@@ -704,8 +1297,11 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                           <button onClick={() => { setSelectedProxy(proxy); setShowActionMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                             <Eye className="w-3 h-3" /> View Details
                           </button>
-                          <button className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                            <RefreshCw className="w-3 h-3" /> Renew
+                          <button onClick={() => { setEditingNoteId(proxy.proxyId); setEditingNoteValue(proxy.notes || ''); setShowActionMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                            <Edit className="w-3 h-3" /> Notes
+                          </button>
+                          <button onClick={() => { openExtendModal(proxy); setShowActionMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                            <RefreshCw className="w-3 h-3" /> Extend
                           </button>
                           <button onClick={() => { copyToClipboard(`${proxy.connectIp || proxy.publicIp}:${proxy.httpPort}:${proxy.username}:${proxy.password}`); setShowActionMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                             <Copy className="w-3 h-3" /> Copy Config
@@ -768,7 +1364,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Location <span className="text-red-500">*</span></label>
-                  <select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
+                  <select value={addProxyLocation} onChange={(e) => setAddProxyLocation(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
                     <option value="">Select Location</option>
                     <option value="US">🇺🇸 United States</option>
                     <option value="UK">🇬🇧 United Kingdom</option>
@@ -782,6 +1378,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ISP <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    value={addProxyIsp}
+                    onChange={(e) => setAddProxyIsp(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="Enter ISP name"
                   />
@@ -794,6 +1392,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Expires <span className="text-red-500">*</span></label>
                   <input
                     type="datetime-local"
+                    value={addProxyExpires}
+                    onChange={(e) => setAddProxyExpires(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
@@ -801,6 +1401,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Connect IP <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    value={addProxyIp}
+                    onChange={(e) => setAddProxyIp(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="192.168.1.1"
                   />
@@ -813,6 +1415,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Username <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    value={addProxyUsername}
+                    onChange={(e) => setAddProxyUsername(e.target.value)}
                     className="w-full px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="username"
                   />
@@ -821,6 +1425,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Password <span className="text-red-500">*</span></label>
                   <input
                     type="password"
+                    value={addProxyPassword}
+                    onChange={(e) => setAddProxyPassword(e.target.value)}
                     className="w-full px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="••••••••"
                   />
@@ -832,6 +1438,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">HTTP Port <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    value={addProxyHttpPort}
+                    onChange={(e) => setAddProxyHttpPort(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="8080"
                   />
@@ -840,6 +1448,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Notes</label>
                   <textarea
                     rows={2}
+                    value={addProxyNotes}
+                    onChange={(e) => setAddProxyNotes(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                     placeholder="Optional notes about this proxy"
                   />
@@ -850,7 +1460,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               <button onClick={() => setShowAddModal(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button className="flex items-center gap-1.5 px-5 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium">
+              <button onClick={handleAddManualProxy} className="flex items-center gap-1.5 px-5 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium">
                 <Plus className="w-3.5 h-3.5" /> Add Proxy
               </button>
             </div>
@@ -873,26 +1483,62 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               <p className="text-xs text-white/80 mt-0.5">CONFIGURE YOUR PROXY SERVICE BASED ON YOUR NEEDS</p>
             </div>
             <div className="p-6 space-y-5">
+              {!orderOptions && (
+                <div className="flex items-center justify-center py-4 text-gray-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading order options...
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Country <span className="text-red-500">*</span></label>
-                  <select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                    <option value="US">🇺🇸 United States</option>
-                    <option value="UK">🇬🇧 United Kingdom</option>
-                    <option value="DE">🇩🇪 Germany</option>
-                    <option value="FR">🇫🇷 France</option>
-                    <option value="CA">🇨🇦 Canada</option>
-                    <option value="AU">🇦🇺 Australia</option>
+                  <select
+                    value={orderCountry}
+                    onChange={(e) => { setOrderCountry(e.target.value); setOrderIsp(''); }}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Select Country</option>
+                    {orderOptions?.countries && (
+                      Array.isArray(orderOptions.countries)
+                        ? (orderOptions.countries as any[]).map((c: any) => {
+                            // Handle both string array ["US","UK",...] and object array [{code,name},...]
+                            const code = typeof c === 'string' ? c : (c.code || c.id || c.value || '');
+                            const name = typeof c === 'string' ? (countryNames[c] || c) : (c.name || c.label || code);
+                            return <option key={code} value={code}>{countryFlags[code] || ''} {name}</option>;
+                          })
+                        : Object.entries(orderOptions.countries).map(([code, name]) => (
+                            <option key={code} value={code}>{countryFlags[code] || ''} {typeof name === 'string' ? name : (name as any)?.name || countryNames[code] || code}</option>
+                          ))
+                    )}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ISP Provider <span className="text-red-500">*</span></label>
-                  <select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
-                    <option value="">Select ISP (Required)</option>
-                    <option value="comcast">Comcast</option>
-                    <option value="verizon">Verizon</option>
-                    <option value="att">AT&T</option>
-                    <option value="spectrum">Spectrum</option>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ISP Provider</label>
+                  <select
+                    value={orderIsp}
+                    onChange={(e) => { setOrderIsp(e.target.value); }}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Any ISP</option>
+                    {(() => {
+                      const isps = orderOptions?.isps;
+                      if (!isps || !orderCountry) return null;
+                      // isps could be: { countryCode: [...] } or flat array
+                      let ispList: any[] = [];
+                      if (Array.isArray(isps)) {
+                        ispList = isps;
+                      } else if (isps[orderCountry]) {
+                        ispList = Array.isArray(isps[orderCountry]) ? isps[orderCountry] : [];
+                      } else if (isps[orderCountry.toUpperCase()]) {
+                        ispList = Array.isArray(isps[orderCountry.toUpperCase()]) ? isps[orderCountry.toUpperCase()] : [];
+                      } else if (isps[orderCountry.toLowerCase()]) {
+                        ispList = Array.isArray(isps[orderCountry.toLowerCase()]) ? isps[orderCountry.toLowerCase()] : [];
+                      }
+                      return ispList.map((isp: any) => {
+                        const id = isp.id || isp.isp_id || isp.value || '';
+                        const name = isp.label || isp.name || isp.isp_name || id;
+                        return <option key={id} value={id}>{name}</option>;
+                      });
+                    })()}
                   </select>
                   <p className="text-[10px] text-gray-400 mt-1">Choose specific ISP for better targeting</p>
                 </div>
@@ -904,7 +1550,8 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <input
                     type="number"
                     min="1"
-                    defaultValue="1"
+                    value={orderQuantity}
+                    onChange={(e) => { setOrderQuantity(Math.max(1, parseInt(e.target.value) || 1)); }}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
@@ -914,7 +1561,11 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Duration <span className="text-red-500">*</span></label>
-                  <select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
+                  <select
+                    value={orderDuration}
+                    onChange={(e) => { setOrderDuration(parseInt(e.target.value)); }}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                  >
                     <option value="1">1 Month</option>
                     <option value="3">3 Months</option>
                     <option value="6">6 Months</option>
@@ -926,11 +1577,17 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <div className="flex gap-2">
                     <input
                       type="text"
+                      value={orderCoupon}
+                      onChange={(e) => { setOrderCoupon(e.target.value); }}
                       className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                       placeholder="Enter coupon code"
                     />
-                    <button className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap">
-                      <Check className="w-3.5 h-3.5" /> Apply
+                    <button
+                      onClick={handleCalculatePrice}
+                      disabled={priceLoading}
+                      className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50"
+                    >
+                      {priceLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Apply
                     </button>
                   </div>
                 </div>
@@ -944,28 +1601,24 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Unit Price:</span>
-                    <span className="text-gray-700">$0.00</span>
+                    <span className="text-gray-700">${priceData?.unitPrice?.toFixed(2) ?? '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Price (No Discounts):</span>
-                    <span className="text-gray-700">$0.00</span>
+                    <span className="text-gray-700">${priceData?.totalPrice?.toFixed(2) ?? '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Discount Amount:</span>
-                    <span className="text-green-600">-$0.00</span>
+                    <span className="text-gray-500">Discount ({priceData?.discountPercentage ?? 0}%):</span>
+                    <span className="text-green-600">-${priceData?.discount?.toFixed(2) ?? '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Subtotal:</span>
-                    <span className="text-gray-700">$0.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Payment Fee:</span>
-                    <span className="text-gray-700">$0.00</span>
+                    <span className="text-gray-700">${((priceData?.totalPrice ?? 0) - (priceData?.discount ?? 0)).toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="flex justify-between mt-3 pt-2 border-t text-sm font-bold">
                   <span className="text-gray-800">Total Price:</span>
-                  <span className="text-gray-900">$0.00</span>
+                  <span className="text-gray-900">${priceData?.finalPrice?.toFixed(2) ?? '0.00'} {priceData?.currency ?? 'USD'}</span>
                 </div>
               </div>
             </div>
@@ -973,13 +1626,20 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
               <button onClick={() => setShowOrderModal(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button className="flex items-center gap-1.5 px-5 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium">
-                <ShoppingCart className="w-3.5 h-3.5" /> Place Order
+              <button
+                onClick={handlePlaceOrder}
+                disabled={orderLoading || !priceData}
+                className="flex items-center gap-1.5 px-5 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {orderLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
+                Place Order
               </button>
             </div>
           </div>
         </div>
       )}
+      {/* ─── Extend Proxy Modal ─── */}
+      {renderExtendModal()}
     </div>
   );
 }

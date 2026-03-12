@@ -14,6 +14,7 @@ require_once __DIR__ . '/../services/GoLoginDataService.php';
 require_once __DIR__ . '/../services/GoLoginSyncService.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../services/UserService.php';
+require_once __DIR__ . '/../services/ExternalProxyService.php';
 
 try {
     $dataService = new GoLoginDataService();
@@ -155,6 +156,59 @@ try {
                 
                 $userData = $userService->getUser($userId);
                 echo json_encode(['success' => true, 'data' => $userData]);
+                
+            } elseif ($action === 'proxy_list') {
+                // Get proxy list from external API
+                $extProxy = new ExternalProxyService();
+                
+                $filters = [];
+                if (isset($_GET['status'])) $filters['status'] = $_GET['status'];
+                if (isset($_GET['search'])) $filters['search'] = $_GET['search'];
+                if (isset($_GET['country'])) $filters['country'] = $_GET['country'];
+                if (isset($_GET['network'])) $filters['network'] = $_GET['network'];
+                if (isset($_GET['isp'])) $filters['isp'] = $_GET['isp'];
+                
+                // Admin can view all or filter by seller username
+                // Leader/Seller: use their own username
+                $isAdmin = ($user['roles'] === '1');
+                
+                if ($isAdmin && isset($_GET['seller_username']) && $_GET['seller_username'] !== '' && $_GET['seller_username'] !== 'all') {
+                    $username = $_GET['seller_username'];
+                } else {
+                    $username = $user['userName'];
+                }
+                
+                $result = $extProxy->getProxyList($username, $filters);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_stats') {
+                // Get proxy statistics from external API
+                $extProxy = new ExternalProxyService();
+                
+                $isAdmin = ($user['roles'] === '1');
+                if ($isAdmin && isset($_GET['seller_username']) && $_GET['seller_username'] !== '' && $_GET['seller_username'] !== 'all') {
+                    $username = $_GET['seller_username'];
+                } else {
+                    $username = $user['userName'];
+                }
+                
+                $result = $extProxy->getProxyStats($username);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_detail') {
+                // Get proxy detail from external API
+                $proxyId = isset($pathParts[3]) ? $pathParts[3] : ($_GET['proxy_id'] ?? null);
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Proxy ID is required']);
+                    exit();
+                }
+                
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                
+                $result = $extProxy->getProxyDetail($username, $proxyId);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
                 
             } else {
                 http_response_code(404);
@@ -605,6 +659,219 @@ try {
                 
                 $folders = $dataService->getProfileFolders($profileId);
                 echo json_encode(['success' => true, 'data' => $folders]);
+                
+            } elseif ($action === 'proxy_order_options') {
+                // Get order options from external API
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                
+                $serviceType = $input['service_type'] ?? 'static-residential-ipv4';
+                $planId = $input['plan_id'] ?? 'standard';
+                
+                $result = $extProxy->getOrderOptions($username, $serviceType, $planId);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_calculate_price') {
+                // Calculate order price from external API
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                
+                $orderData = [
+                    'service_type' => $input['service_type'] ?? 'static-residential-ipv4',
+                    'plan_id' => $input['plan_id'] ?? 'standard',
+                    'quantity' => (int)($input['quantity'] ?? 1),
+                    'duration' => (int)($input['duration'] ?? 1),
+                    'country' => $input['country'] ?? '',
+                ];
+                if (!empty($input['isp_id'])) {
+                    $orderData['isp_id'] = $input['isp_id'];
+                }
+                if (!empty($input['coupon_code'])) {
+                    $orderData['coupon_code'] = $input['coupon_code'];
+                }
+                
+                $result = $extProxy->calculatePrice($username, $orderData);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_order') {
+                // Place proxy order via external API
+                // Only Admin and Leader can place orders
+                if ($user['roles'] !== '1' && $user['roles'] !== '2') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Only Admin and Leader can place proxy orders']);
+                    exit();
+                }
+                
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                
+                $orderData = [
+                    'service_type' => $input['service_type'] ?? 'static-residential-ipv4',
+                    'plan_id' => $input['plan_id'] ?? 'standard',
+                    'quantity' => (int)($input['quantity'] ?? 1),
+                    'duration' => (int)($input['duration'] ?? 1),
+                    'country' => $input['country'] ?? '',
+                ];
+                if (!empty($input['isp_id'])) {
+                    $orderData['isp_id'] = $input['isp_id'];
+                }
+                if (!empty($input['coupon_code'])) {
+                    $orderData['coupon_code'] = $input['coupon_code'];
+                }
+                
+                $result = $extProxy->placeOrder($username, $orderData);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_sync') {
+                // Sync proxies from external API
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                
+                $result = $extProxy->syncProxies($username);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_update_note') {
+                // Update proxy note (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $notes = $input['notes'] ?? null;
+                $result = $extProxy->updateNote($username, $proxyId, $notes);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_extension_price') {
+                // Calculate extension price (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $period = (int)($input['period_in_months'] ?? 1);
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $result = $extProxy->getExtensionPrice($username, $proxyId, $period);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_extend') {
+                // Extend proxy period (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $period = (int)($input['period_in_months'] ?? 1);
+                $coupon = $input['coupon_code'] ?? null;
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $result = $extProxy->extendProxy($username, $proxyId, $period, $coupon);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_add_manual') {
+                // Add manual proxy (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $data = [
+                    'location' => $input['location'] ?? '',
+                    'isp' => $input['isp'] ?? '',
+                    'expires' => $input['expires'] ?? '',
+                    'connect_ip' => $input['connect_ip'] ?? '',
+                    'proxy_username' => $input['proxy_username'] ?? '',
+                    'proxy_password' => $input['proxy_password'] ?? '',
+                    'http_port' => (int)($input['http_port'] ?? 0),
+                ];
+                if (!empty($input['notes'])) {
+                    $data['notes'] = $input['notes'];
+                }
+                $result = $extProxy->addManualProxy($username, $data);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_update_manual_expiration') {
+                // Update manual proxy expiration (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $expiresAt = $input['expires_at'] ?? null;
+                if (!$proxyId || !$expiresAt) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id and expires_at are required']);
+                    exit();
+                }
+                $result = $extProxy->updateManualExpiration($username, $proxyId, $expiresAt);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_change_whitelisted_ips') {
+                // Change whitelisted IPs (v2)
+                $extProxy = new ExternalProxyService();
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $ips = $input['ips'] ?? [];
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $result = $extProxy->changeWhitelistedIps($username, $proxyId, $ips);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_sellers') {
+                // Get sellers list from external API (v2)
+                $extProxy = new ExternalProxyService();
+                $isAdmin = ($user['roles'] === '1');
+                if (!$isAdmin) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Only Admin can access sellers list']);
+                    exit();
+                }
+                $username = $user['userName'];
+                $result = $extProxy->getSellers($username);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_update_seller') {
+                // Update proxy seller assignment (v2, Admin only)
+                $extProxy = new ExternalProxyService();
+                $isAdmin = ($user['roles'] === '1');
+                if (!$isAdmin) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Only Admin can update seller assignment']);
+                    exit();
+                }
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $sellerUsername = $input['seller_username'] ?? null;
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $result = $extProxy->updateSeller($username, $proxyId, $sellerUsername);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
+                
+            } elseif ($action === 'proxy_delete') {
+                // Delete proxy (v2, Admin only)
+                $extProxy = new ExternalProxyService();
+                $isAdmin = ($user['roles'] === '1');
+                if (!$isAdmin) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Only Admin can delete proxies']);
+                    exit();
+                }
+                $username = $user['userName'];
+                $proxyId = $input['proxy_id'] ?? null;
+                $reason = $input['reason'] ?? null;
+                if (!$proxyId) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'proxy_id is required']);
+                    exit();
+                }
+                $result = $extProxy->deleteProxy($username, $proxyId, $reason);
+                echo json_encode(['success' => true, 'data' => $result['data'] ?? $result]);
                 
             } else {
                 http_response_code(404);
