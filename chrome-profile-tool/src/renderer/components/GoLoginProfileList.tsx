@@ -23,16 +23,17 @@ interface GoLoginProfileListProps {
   onProfileLaunch?: (profileId: string) => void;
   onRefresh?: () => Promise<void>;
   currentUser?: any;
+  initialFolderId?: string;
 }
 
-export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: GoLoginProfileListProps) {
+export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, initialFolderId }: GoLoginProfileListProps) {
   const isSeller = currentUser?.roles === '3';
   const [profiles, setProfiles] = useState<GoLoginProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalProfiles, setTotalProfiles] = useState(0);
-  const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [selectedFolder, setSelectedFolder] = useState<string>(initialFolderId || '');
   const [folders, setFolders] = useState<any[]>([]);
   const [hasAssignedFolders, setHasAssignedFolders] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -82,6 +83,62 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser }: 
   const [proxyPort, setProxyPort] = useState('');
   const [proxyUsername, setProxyUsername] = useState('');
   const [proxyPassword, setProxyPassword] = useState('');
+
+  // Fetch running profiles from backend on mount (restores state after tab switch/reload)
+  useEffect(() => {
+    const fetchRunningProfiles = async () => {
+      try {
+        // Local SDK running profiles (this machine)
+        const activeBrowsers = await window.electronAPI.gologinSDKGetActiveBrowsers();
+        const localRunning = new Set<string>(activeBrowsers || []);
+
+        // For admin: also fetch global running from GoLogin API (all users)
+        const isAdmin = currentUser?.roles === '1';
+        if (isAdmin) {
+          try {
+            let allApiProfiles: any[] = [];
+            const firstResult = await window.electronAPI.gologinListProfiles();
+            if (firstResult?.profiles) {
+              allApiProfiles = [...firstResult.profiles];
+              const total = firstResult.allProfilesCount || firstResult.total || firstResult.profiles.length;
+              const perPage = firstResult.profiles.length;
+              if (perPage > 0 && total > perPage) {
+                const pages = Math.ceil(total / perPage);
+                const promises = [];
+                for (let p = 2; p <= pages; p++) {
+                  promises.push(window.electronAPI.gologinListProfiles(p));
+                }
+                const results = await Promise.allSettled(promises);
+                for (const r of results) {
+                  if (r.status === 'fulfilled' && r.value?.profiles) {
+                    allApiProfiles = allApiProfiles.concat(r.value.profiles);
+                  }
+                }
+              }
+              // Add globally running profiles (canBeRunning === false)
+              for (const p of allApiProfiles) {
+                if (p.canBeRunning === false) {
+                  localRunning.add(p.id);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to fetch global running profiles:', err);
+          }
+        }
+
+        if (localRunning.size > 0) {
+          setRunningProfiles(localRunning);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch running profiles:', err);
+      }
+    };
+    fetchRunningProfiles();
+    // Poll global running status every 15 seconds
+    const interval = setInterval(fetchRunningProfiles, 15000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Listen for browser closed events
   useEffect(() => {

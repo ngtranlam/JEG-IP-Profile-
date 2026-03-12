@@ -12,6 +12,7 @@ type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -181,13 +182,28 @@ function App() {
 
     switch (activeView) {
       case 'dashboard':
-        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} currentUser={currentUser} />;
+        return (
+          <Dashboard
+            goLoginStats={goLoginStats}
+            onRefresh={loadGoLoginData}
+            currentUser={currentUser}
+            onViewChange={(view: ActiveView) => {
+              setActiveView(view);
+              if (view !== 'profiles') setSelectedFolderId('');
+            }}
+            onSelectFolder={(folderId: string) => {
+              setSelectedFolderId(folderId);
+              setActiveView('profiles');
+            }}
+          />
+        );
       case 'profiles':
         return (
           <GoLoginProfileList
             onProfileLaunch={(profileId) => console.log('GoLogin profile launched:', profileId)}
             onRefresh={loadGoLoginData}
             currentUser={currentUser}
+            initialFolderId={selectedFolderId}
           />
         );
       case 'folders':
@@ -203,7 +219,21 @@ function App() {
           />
         );
       default:
-        return <Dashboard goLoginStats={goLoginStats} onRefresh={loadGoLoginData} currentUser={currentUser} />;
+        return (
+          <Dashboard
+            goLoginStats={goLoginStats}
+            onRefresh={loadGoLoginData}
+            currentUser={currentUser}
+            onViewChange={(view: ActiveView) => {
+              setActiveView(view);
+              if (view !== 'profiles') setSelectedFolderId('');
+            }}
+            onSelectFolder={(folderId: string) => {
+              setSelectedFolderId(folderId);
+              setActiveView('profiles');
+            }}
+          />
+        );
     }
   };
 
@@ -252,7 +282,10 @@ function App() {
     <div className="flex h-screen bg-background">
       <Sidebar 
         activeView={activeView} 
-        onViewChange={setActiveView}
+        onViewChange={(view) => {
+          setActiveView(view);
+          setSelectedFolderId('');
+        }}
         onLogout={handleLogout}
         currentUser={currentUser}
       />
