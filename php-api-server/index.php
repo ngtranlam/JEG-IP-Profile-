@@ -35,6 +35,10 @@ if (count($pathParts) >= 1 && $pathParts[0] === 'api') {
             case 'local_data':
                 require_once __DIR__ . '/api/local_data.php';
                 break;
+
+            case 'teams':
+                require_once __DIR__ . '/api/teams.php';
+                break;
                 
             default:
                 http_response_code(404);

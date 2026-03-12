@@ -202,9 +202,6 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
       <div className="flex items-center justify-between p-6 border-b">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Folders Management</h1>
-          <p className="text-gray-600 mt-1">
-            {isAdmin ? 'Manage folders and assign them to sellers' : 'Your assigned folders'}
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -218,7 +215,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
           {isAdmin && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Create Folder
@@ -256,7 +253,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
             {!searchTerm && isAdmin && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Create Folder
@@ -417,7 +414,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Folder
               </button>
@@ -466,7 +463,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
               <button
                 onClick={handleEditFolder}
                 disabled={!editFolderName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save Changes
               </button>
@@ -520,7 +517,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
               <button
                 onClick={handleAssignSeller}
                 disabled={!selectedSellerId}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Assign Seller
               </button>

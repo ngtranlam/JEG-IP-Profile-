@@ -70,6 +70,7 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
   const [runningProfileIds, setRunningProfileIds] = useState<string[]>([]);
   const [globalRunningIds, setGlobalRunningIds] = useState<Set<string>>(new Set());
   const [goLoginTotal, setGoLoginTotal] = useState(0);
+  const [localDbTotal, setLocalDbTotal] = useState(0);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const globalPollingRef = useRef<NodeJS.Timeout | null>(null);
   const fullFetchDone = useRef(false);
@@ -199,10 +200,12 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
       const profilesData = await window.electronAPI.localDataGetProfiles(1, 50);
       if (profilesData && profilesData.profiles) {
         setAllProfiles(profilesData.profiles);
+        setLocalDbTotal(profilesData.total || profilesData.profiles.length);
         updateRecentProfiles(profilesData.profiles);
       } else {
         setRecentProfiles([]);
         setAllProfiles([]);
+        setLocalDbTotal(0);
       }
       
       // Load folders from database - only for Admin
@@ -262,8 +265,13 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
   // Running = union of local SDK (instant) + GoLogin API (global from all users)
   // This ensures local launches show immediately AND remote user launches show too
   const allRunningIds = new Set([...globalRunningIds, ...runningProfileIds]);
-  const runningCount = isAdmin ? allRunningIds.size : runningProfileIds.length;
-  const totalCount = goLoginTotal;
+  // For non-admin, only count running profiles that belong to them (from local DB)
+  const ownProfileIds = new Set(allProfiles.map((p: any) => p.profile_id || p.id));
+  const ownRunningCount = isAdmin
+    ? allRunningIds.size
+    : [...allRunningIds].filter(id => ownProfileIds.has(id)).length + runningProfileIds.filter(id => ownProfileIds.has(id) && !allRunningIds.has(id)).length;
+  const runningCount = ownRunningCount;
+  const totalCount = isAdmin ? goLoginTotal : localDbTotal;
   const availableCount = Math.max(0, totalCount - runningCount);
 
   // Check if a profile is running (combines local SDK + global GoLogin API data)
@@ -293,9 +301,6 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Welcome back, <span className="font-medium text-gray-700">{currentUser?.fullName || currentUser?.userName || 'Admin'}</span>
-          </p>
         </div>
 
         {/* Stats Cards Row */}

@@ -586,6 +586,93 @@ export class ApiService {
     });
   }
 
+  // Team management methods
+  async getTeams(token: string): Promise<any[]> {
+    const response = await this.makeRequest('/teams', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async createTeam(token: string, data: { name: string; leaderId?: number }): Promise<any> {
+    const response = await this.makeRequest('/teams', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    return response.data;
+  }
+
+  async updateTeam(token: string, teamId: number, data: { name?: string; leaderId?: number }): Promise<void> {
+    await this.makeRequest(`/teams/${teamId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTeam(token: string, teamId: number): Promise<void> {
+    await this.makeRequest(`/teams/${teamId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  async getTeamMembers(token: string, teamId: number): Promise<any[]> {
+    const response = await this.makeRequest(`/teams/${teamId}/members`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async addTeamMember(token: string, teamId: number, userId: number): Promise<void> {
+    await this.makeRequest(`/teams/${teamId}/members`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async removeTeamMember(token: string, teamId: number, userId: number): Promise<void> {
+    await this.makeRequest(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  async getMemberFolders(token: string, teamId: number, userId: number): Promise<any[]> {
+    const response = await this.makeRequest(`/teams/${teamId}/members/${userId}/folders`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async setMemberFolders(token: string, teamId: number, userId: number, folderIds: string[]): Promise<void> {
+    await this.makeRequest(`/teams/${teamId}/members/${userId}/folders`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ folderIds }),
+    });
+  }
+
   async changePassword(token: string, oldPassword: string, newPassword: string): Promise<void> {
     await this.makeRequest('/auth/change_password', {
       method: 'POST',

@@ -481,8 +481,8 @@ try {
                 echo json_encode(['success' => true, 'message' => 'User status toggled']);
                 
             } elseif ($action === 'assign_profile_folders') {
-                // Assign profile to folders (Admin only)
-                if ($user['roles'] !== '1') {
+                // Assign profile to folders (Admin and Leader)
+                if ($user['roles'] !== '1' && $user['roles'] !== '2') {
                     http_response_code(403);
                     echo json_encode(['success' => false, 'error' => 'Admin access required']);
                     exit();
@@ -513,8 +513,8 @@ try {
                 echo json_encode(['success' => true, 'message' => 'Profile assigned to folders']);
                 
             } elseif ($action === 'remove_profile_folders') {
-                // Remove profile from folders (Admin only)
-                if ($user['roles'] !== '1') {
+                // Remove profile from folders (Admin and Leader)
+                if ($user['roles'] !== '1' && $user['roles'] !== '2') {
                     http_response_code(403);
                     echo json_encode(['success' => false, 'error' => 'Admin access required']);
                     exit();
@@ -545,8 +545,8 @@ try {
                 echo json_encode(['success' => true, 'message' => 'Profile removed from folders']);
                 
             } elseif ($action === 'set_profile_folders') {
-                // Set profile folders (replace all existing) - Admin only
-                if ($user['roles'] !== '1') {
+                // Set profile folders (replace all existing) - Admin and Leader
+                if ($user['roles'] !== '1' && $user['roles'] !== '2') {
                     http_response_code(403);
                     echo json_encode(['success' => false, 'error' => 'Admin access required']);
                     exit();

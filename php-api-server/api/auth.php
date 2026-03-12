@@ -86,6 +86,7 @@ try {
                 // Add role information to user data
                 $user['roleName'] = $userService->getRoleName($user);
                 $user['isAdmin'] = $userService->isAdmin($user);
+                $user['isLeader'] = $userService->isLeader($user);
                 $user['isSeller'] = $userService->isSeller($user);
                 
                 echo json_encode(['success' => true, 'data' => $user]);
@@ -97,6 +98,7 @@ try {
                 
                 $permissions = [
                     'isAdmin' => $userService->isAdmin($user),
+                    'isLeader' => $userService->isLeader($user),
                     'isSeller' => $userService->isSeller($user),
                     'roleName' => $userService->getRoleName($user),
                     'canViewAllFolders' => $userService->isAdmin($user),

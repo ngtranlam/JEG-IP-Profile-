@@ -51,6 +51,26 @@ class AuthMiddleware {
         return $user;
     }
 
+    public function requireLeader($token) {
+        $user = $this->authenticate($token);
+        
+        if (!$this->userService->isLeader($user)) {
+            throw new Exception("Leader access required");
+        }
+
+        return $user;
+    }
+
+    public function requireAdminOrLeader($token) {
+        $user = $this->authenticate($token);
+        
+        if (!$this->userService->isAdmin($user) && !$this->userService->isLeader($user)) {
+            throw new Exception("Admin or Leader access required");
+        }
+
+        return $user;
+    }
+
     public function requireAdminOrSeller($token) {
         $user = $this->authenticate($token);
         

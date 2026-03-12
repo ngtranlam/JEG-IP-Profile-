@@ -210,7 +210,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     setResetSuccess(false);
                     setResetEmail('');
                   }}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
                 >
                   Close
                 </button>
@@ -273,7 +273,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       }
                     }}
                     disabled={sendingReset}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     {sendingReset ? (
                       <>

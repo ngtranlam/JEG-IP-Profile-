@@ -405,6 +405,61 @@ class ChromeProfileTool {
       return await this.apiService.toggleUserStatus(token, userId);
     });
 
+    // Team management IPC handlers
+    ipcMain.handle('teams:list', async () => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getTeams(token);
+    });
+
+    ipcMain.handle('teams:create', async (_, data) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.createTeam(token, data);
+    });
+
+    ipcMain.handle('teams:update', async (_, teamId, data) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.updateTeam(token, teamId, data);
+    });
+
+    ipcMain.handle('teams:delete', async (_, teamId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.deleteTeam(token, teamId);
+    });
+
+    ipcMain.handle('teams:get-members', async (_, teamId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getTeamMembers(token, teamId);
+    });
+
+    ipcMain.handle('teams:add-member', async (_, teamId, userId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.addTeamMember(token, teamId, userId);
+    });
+
+    ipcMain.handle('teams:remove-member', async (_, teamId, userId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.removeTeamMember(token, teamId, userId);
+    });
+
+    ipcMain.handle('teams:get-member-folders', async (_, teamId, userId) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.getMemberFolders(token, teamId, userId);
+    });
+
+    ipcMain.handle('teams:set-member-folders', async (_, teamId, userId, folderIds) => {
+      const token = this.authService.getCurrentToken();
+      if (!token) throw new Error('Not authenticated');
+      return await this.apiService.setMemberFolders(token, teamId, userId, folderIds);
+    });
+
     // Authentication IPC handlers
     ipcMain.handle('auth:login', async (_, userName, password) => {
       try {

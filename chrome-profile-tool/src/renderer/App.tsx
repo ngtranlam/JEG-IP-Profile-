@@ -3,12 +3,13 @@ import { Dashboard } from './components/Dashboard';
 import { GoLoginProfileList } from './components/GoLoginProfileList';
 import { FolderListTable } from './components/FolderListTable';
 import { UserManagement } from './components/UserManagement';
+import { TeamManagement } from './components/TeamManagement';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { TwoFactorVerification } from './components/TwoFactorVerification';
 
-type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users';
+type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
@@ -215,6 +216,12 @@ function App() {
       case 'users':
         return (
           <UserManagement
+            currentUser={currentUser}
+          />
+        );
+      case 'teams':
+        return (
+          <TeamManagement
             currentUser={currentUser}
           />
         );

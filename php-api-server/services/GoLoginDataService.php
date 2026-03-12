@@ -25,6 +25,25 @@ class GoLoginDataService {
             
             $stmt = $this->conn->prepare($sql);
             $stmt->execute();
+        } elseif ($userRole === '2') {
+            // Leader can see own folders + all folders of team members (via seller_id)
+            $sql = "SELECT DISTINCT f.folder_id, f.name, f.seller_id, f.created_at, f.updated_at, f.synced_at,
+                    u.userName as seller_name,
+                    (SELECT COUNT(*) FROM gologin_profile_folders WHERE folder_id = f.folder_id) as profilesCount
+                    FROM gologin_folders f
+                    LEFT JOIN users u ON f.seller_id = u.id
+                    WHERE f.seller_id = :user_id
+                    OR f.seller_id IN (
+                        SELECT tm.user_id FROM team_members tm
+                        INNER JOIN teams t ON tm.team_id = t.id
+                        WHERE t.leader_id = :leader_id
+                    )
+                    ORDER BY f.created_at DESC";
+            
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->bindParam(':leader_id', $userId);
+            $stmt->execute();
         } else {
             // Seller can only see folders assigned to them
             $sql = "SELECT f.folder_id, f.name, f.seller_id, f.created_at, f.updated_at, f.synced_at,
@@ -88,7 +107,25 @@ class GoLoginDataService {
         }
         
         // Role-based filtering
-        if ($userRole === '3' && $userId) {
+        if ($userRole === '2' && $userId) {
+            // Leader can see profiles in own folders + all folders of team members (via seller_id)
+            $whereConditions[] = "EXISTS (
+                SELECT 1 FROM gologin_profile_folders pf
+                INNER JOIN gologin_folders f ON pf.folder_id = f.folder_id
+                WHERE pf.profile_id = p.profile_id
+                AND (
+                    f.seller_id = :user_id
+                    OR f.seller_id IN (
+                        SELECT tm.user_id FROM team_members tm
+                        INNER JOIN teams t ON tm.team_id = t.id
+                        WHERE t.leader_id = :leader_id
+                    )
+                )
+            )";
+            $params[':user_id'] = $userId;
+            $params[':leader_id'] = $userId;
+            error_log("Adding leader filter: userId = $userId");
+        } elseif ($userRole === '3' && $userId) {
             // Seller can only see profiles in folders assigned to them
             // Use junction table to support many-to-many relationship
             $whereConditions[] = "EXISTS (
@@ -614,9 +651,9 @@ class GoLoginDataService {
      * Get all sellers (users with role='3')
      */
     public function getAllSellers() {
-        $sql = "SELECT id, userName, fullName, email, status 
+        $sql = "SELECT id, userName, fullName, email, roles, status 
                 FROM users 
-                WHERE roles = '3' AND status = '1'
+                WHERE (roles = '2' OR roles = '3') AND status = '1'
                 ORDER BY userName ASC";
         
         $stmt = $this->conn->prepare($sql);

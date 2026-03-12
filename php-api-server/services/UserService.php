@@ -147,6 +147,10 @@ class UserService {
         return isset($user['roles']) && $user['roles'] === '1';
     }
 
+    public function isLeader($user) {
+        return isset($user['roles']) && $user['roles'] === '2';
+    }
+
     public function isSeller($user) {
         return isset($user['roles']) && $user['roles'] === '3';
     }
@@ -154,6 +158,20 @@ class UserService {
     public function hasPermission($user, $permission) {
         if ($this->isAdmin($user)) {
             return true; // Admin has all permissions
+        }
+
+        if ($this->isLeader($user)) {
+            $leaderPermissions = [
+                'view_own_profiles',
+                'view_own_folders',
+                'create_profile',
+                'edit_profile',
+                'delete_profile',
+                'use_profile',
+                'manage_team',
+                'manage_team_folders'
+            ];
+            return in_array($permission, $leaderPermissions);
         }
 
         if ($this->isSeller($user)) {
@@ -173,6 +191,9 @@ class UserService {
     public function getRoleName($user) {
         if ($this->isAdmin($user)) {
             return 'Admin';
+        }
+        if ($this->isLeader($user)) {
+            return 'Leader';
         }
         if ($this->isSeller($user)) {
             return 'Seller';

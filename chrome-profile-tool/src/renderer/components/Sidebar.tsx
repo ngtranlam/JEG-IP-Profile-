@@ -12,8 +12,8 @@ interface User {
 }
 
 interface SidebarProps {
-  activeView: 'dashboard' | 'profiles' | 'folders' | 'users';
-  onViewChange: (view: 'dashboard' | 'profiles' | 'folders' | 'users') => void;
+  activeView: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams';
+  onViewChange: (view: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams') => void;
   onLogout?: () => void;
   currentUser?: User | null;
 }
@@ -34,8 +34,9 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
-  // Check if user is Admin (roles="1")
+  // Check if user is Admin (roles="1") or Leader (roles="2")
   const isAdmin = currentUser?.roles === '1';
+  const isLeader = currentUser?.roles === '2';
 
   // Check 2FA status from currentUser
   useEffect(() => {
@@ -113,13 +114,15 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
     { id: 'profiles', label: 'Profiles', icon: Cloud },
   ];
   
-  // Add Folders and Users tabs only for Admin
-  const menuItems = isAdmin 
-    ? [...baseMenuItems, 
-       { id: 'folders', label: 'Folders', icon: FolderOpen },
-       { id: 'users', label: 'Users', icon: Users }
-      ]
-    : baseMenuItems;
+  // Add tabs based on role
+  const menuItems = [
+    ...baseMenuItems,
+    ...(isAdmin || isLeader ? [{ id: 'teams', label: 'Teams', icon: Users }] : []),
+    ...(isAdmin ? [
+      { id: 'folders', label: 'Folders', icon: FolderOpen },
+      { id: 'users', label: 'Users', icon: Users }
+    ] : []),
+  ];
 
   return (
     <div className="w-64 bg-card border-r border-border flex flex-col">
@@ -140,7 +143,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders' | 'users')}
+                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams')}
                   className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
@@ -165,15 +168,15 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
               className="w-full bg-gray-50 rounded-lg p-3 mb-3 hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-center space-x-3">
-                <div className="bg-indigo-100 rounded-full p-2">
-                  <User className="h-4 w-4 text-indigo-600" />
+                <div className="bg-orange-100 rounded-full p-2">
+                  <User className="h-4 w-4 text-orange-600" />
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {currentUser.fullName}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {currentUser.roles === '1' ? 'Admin' : 'Seller'}
+                    {currentUser.roles === '1' ? 'Admin' : currentUser.roles === '2' ? 'Leader' : 'Seller'}
                   </p>
                 </div>
                 <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
@@ -229,8 +232,8 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
           <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="bg-indigo-100 rounded-full p-2 mr-3">
-                  <UserCog className="h-5 w-5 text-indigo-600" />
+                <div className="bg-orange-100 rounded-full p-2 mr-3">
+                  <UserCog className="h-5 w-5 text-orange-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Account Settings
@@ -281,7 +284,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
                           ? 'bg-purple-100 text-purple-800' 
                           : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {currentUser?.roles === '1' ? 'Administrator' : 'Seller'}
+                        {currentUser?.roles === '1' ? 'Administrator' : currentUser?.roles === '2' ? 'Leader' : 'Seller'}
                       </span>
                     </div>
                   </div>
@@ -315,8 +318,8 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
                           handleDisable2FA();
                         }
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                        is2FAEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                        is2FAEnabled ? 'bg-orange-600' : 'bg-gray-200'
                       }`}
                     >
                       <span
@@ -333,7 +336,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setShowAccountSettings(false)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
               >
                 Close
               </button>
@@ -348,8 +351,8 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="bg-blue-100 rounded-full p-2 mr-3">
-                  <KeyRound className="h-5 w-5 text-blue-600" />
+                <div className="bg-orange-100 rounded-full p-2 mr-3">
+                  <KeyRound className="h-5 w-5 text-orange-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Change Password
@@ -483,7 +486,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
               </button>
               <button
                 onClick={handleChangePassword}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
               >
                 Change Password
               </button>

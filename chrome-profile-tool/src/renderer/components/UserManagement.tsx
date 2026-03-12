@@ -155,6 +155,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
   const getRoleName = (role: string) => {
     switch (role) {
       case '1': return 'Admin';
+      case '2': return 'Leader';
       case '3': return 'Seller';
       default: return 'Unknown';
     }
@@ -163,6 +164,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case '1': return 'bg-purple-100 text-purple-800';
+      case '2': return 'bg-orange-100 text-orange-800';
       case '3': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -182,7 +184,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
         <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
         <button
           onClick={handleCreateUser}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
         >
           <Plus className="w-5 h-5" />
           Add User
@@ -388,6 +390,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="1">Admin</option>
+                  <option value="2">Leader</option>
                   <option value="3">Seller</option>
                 </select>
               </div>
@@ -402,7 +405,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
               >
                 <Save className="w-5 h-5" />
                 {editingUser ? 'Update' : 'Create'}

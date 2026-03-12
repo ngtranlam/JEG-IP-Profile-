@@ -1010,7 +1010,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
             className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
               isSeller && !hasAssignedFolders
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-orange-600 text-white hover:bg-orange-700'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -1087,7 +1087,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                 </p>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Add profile
@@ -1211,7 +1211,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     ) : (
                       <span
                         onDoubleClick={() => handleNoteDoubleClick(profile.id, profile.notes || '')}
-                        className="text-xs text-blue-600 truncate cursor-pointer hover:bg-blue-50 px-2 py-1 rounded w-full"
+                        className="text-xs text-orange-600 truncate cursor-pointer hover:bg-orange-50 px-2 py-1 rounded w-full"
                         title="Double-click to edit"
                       >
                         {profile.notes || 'select text for formatting...'}
@@ -1299,7 +1299,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                           <span className="text-xs text-gray-600">{displayText}</span>
                           <button
                             onClick={() => handleOpenEditProxy(profile)}
-                            className="text-gray-400 hover:text-blue-600 transition-colors ml-2"
+                            className="text-gray-400 hover:text-orange-600 transition-colors ml-2"
                             title="Edit Proxy"
                           >
                             <Edit className="w-3.5 h-3.5" />
@@ -1314,7 +1314,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     {!isSeller && (
                       <button
                         onClick={() => handleOpenFolderManager(profile.id)}
-                        className="text-gray-400 hover:text-purple-600 transition-colors"
+                        className="text-gray-400 hover:text-orange-600 transition-colors"
                         title="Manage Folders"
                       >
                         <FolderOpen className="w-4 h-4" />
@@ -1326,7 +1326,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                         setShowCookiesManager(true);
                         await fetchCookies(profile.id);
                       }}
-                      className="text-gray-400 hover:text-blue-600 transition-colors"
+                      className="text-gray-400 hover:text-orange-600 transition-colors"
                       title="Cookies Manager"
                     >
                       <Settings className="w-4 h-4" />
@@ -1437,7 +1437,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     onClick={() => setActiveTab(tab.id)}
                     className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
                       activeTab === tab.id
-                        ? 'border-green-500 text-green-600'
+                        ? 'border-orange-500 text-orange-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -1571,7 +1571,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                   <button 
                     onClick={handleCheckProxy}
                     disabled={checkingProxy || !proxyConfig.host || !proxyConfig.port}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {checkingProxy ? 'Checking...' : 'Check Proxy'}
                   </button>
@@ -1694,7 +1694,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
               <button
                 onClick={handleCreateQuickProfile}
                 disabled={!newProfileName.trim() || creating}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? 'Creating...' : 'Create Profile'}
               </button>
@@ -1727,14 +1727,14 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     setShowCookiesManager(false);
                     setShowImportCookies(true);
                   }}
-                  className="px-3 py-1.5 border border-green-500 text-green-600 rounded text-sm font-medium hover:bg-green-50 transition-colors"
+                  className="px-3 py-1.5 border border-orange-500 text-orange-600 rounded text-sm font-medium hover:bg-orange-50 transition-colors"
                 >
                   Import
                 </button>
                 <button
                   onClick={handleExportCookies}
                   disabled={cookies.length === 0}
-                  className="px-3 py-1.5 border border-green-500 text-green-600 rounded text-sm font-medium hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 border border-orange-500 text-orange-600 rounded text-sm font-medium hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Export
                 </button>
@@ -1928,7 +1928,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                   }
                 }}
                 disabled={!cookiesText.trim()}
-                className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Import
               </button>
@@ -2046,7 +2046,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
               </button>
               <button
                 onClick={handleSaveProxy}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="px-6 py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
               >
                 Save Changes
               </button>
@@ -2132,7 +2132,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                 <button
                   onClick={handleSaveProfileFolders}
                   disabled={loadingFolders}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                  className="px-6 py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-400 transition-colors"
                 >
                   Save Changes
                 </button>

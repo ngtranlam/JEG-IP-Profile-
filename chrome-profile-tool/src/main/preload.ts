@@ -181,6 +181,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   localDataToggleUserStatus: (userId: number) => 
     ipcRenderer.invoke('local-data:toggle-user-status', userId),
 
+  // Team management methods
+  teamsGetList: () =>
+    ipcRenderer.invoke('teams:list'),
+
+  teamsCreate: (data: { name: string; leaderId?: number }) =>
+    ipcRenderer.invoke('teams:create', data),
+
+  teamsUpdate: (teamId: number, data: { name?: string; leaderId?: number }) =>
+    ipcRenderer.invoke('teams:update', teamId, data),
+
+  teamsDelete: (teamId: number) =>
+    ipcRenderer.invoke('teams:delete', teamId),
+
+  teamsGetMembers: (teamId: number) =>
+    ipcRenderer.invoke('teams:get-members', teamId),
+
+  teamsAddMember: (teamId: number, userId: number) =>
+    ipcRenderer.invoke('teams:add-member', teamId, userId),
+
+  teamsRemoveMember: (teamId: number, userId: number) =>
+    ipcRenderer.invoke('teams:remove-member', teamId, userId),
+
+  teamsGetMemberFolders: (teamId: number, userId: number) =>
+    ipcRenderer.invoke('teams:get-member-folders', teamId, userId),
+
+  teamsSetMemberFolders: (teamId: number, userId: number, folderIds: string[]) =>
+    ipcRenderer.invoke('teams:set-member-folders', teamId, userId, folderIds),
+
   // GoLogin SDK methods
   gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') =>
     ipcRenderer.invoke('gologin-sdk:create-profile', name, os),
@@ -364,6 +392,17 @@ declare global {
       localDataUpdateUser: (userData: any) => Promise<void>;
       localDataDeleteUser: (userId: number) => Promise<void>;
       localDataToggleUserStatus: (userId: number) => Promise<void>;
+      
+      // Team management methods
+      teamsGetList: () => Promise<any[]>;
+      teamsCreate: (data: { name: string; leaderId?: number }) => Promise<any>;
+      teamsUpdate: (teamId: number, data: { name?: string; leaderId?: number }) => Promise<void>;
+      teamsDelete: (teamId: number) => Promise<void>;
+      teamsGetMembers: (teamId: number) => Promise<any[]>;
+      teamsAddMember: (teamId: number, userId: number) => Promise<void>;
+      teamsRemoveMember: (teamId: number, userId: number) => Promise<void>;
+      teamsGetMemberFolders: (teamId: number, userId: number) => Promise<any[]>;
+      teamsSetMemberFolders: (teamId: number, userId: number, folderIds: string[]) => Promise<void>;
       
       // GoLogin SDK methods
       gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') => Promise<any>;

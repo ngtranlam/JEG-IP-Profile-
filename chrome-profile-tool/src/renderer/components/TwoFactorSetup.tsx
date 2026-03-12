@@ -173,8 +173,8 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
         <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="bg-indigo-100 rounded-full p-2 mr-3">
-                <Shield className="h-5 w-5 text-indigo-600" />
+              <div className="bg-orange-100 rounded-full p-2 mr-3">
+                <Shield className="h-5 w-5 text-orange-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">
                 Enable Two-Factor Authentication
@@ -193,9 +193,9 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
               Two-factor authentication adds an extra layer of security to your account by requiring a verification code from your authenticator app when you sign in.
             </p>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-900 mb-2">You will need:</h4>
-              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <h4 className="font-semibold text-orange-900 mb-2">You will need:</h4>
+              <ul className="text-sm text-orange-800 space-y-1 list-disc list-inside">
                 <li>An authenticator app (Google Authenticator, Authy, etc.)</li>
                 <li>Your phone or device with the app installed</li>
               </ul>
@@ -217,7 +217,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
             </button>
             <button
               onClick={() => setStep('qr')}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+              className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
             >
               Continue
             </button>
@@ -233,8 +233,8 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
         <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="bg-indigo-100 rounded-full p-2 mr-3">
-                <Shield className="h-5 w-5 text-indigo-600" />
+              <div className="bg-orange-100 rounded-full p-2 mr-3">
+                <Shield className="h-5 w-5 text-orange-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">
                 Scan QR Code
@@ -291,7 +291,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
                 <button
                   onClick={handleCopySecret}
                   disabled={!secretKey}
-                  className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:bg-gray-400"
+                  className="p-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors disabled:bg-gray-400"
                   title="Copy to clipboard"
                 >
                   {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -326,7 +326,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
             <button
               onClick={handleVerify}
               disabled={loading || verificationCode.length !== 6}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -389,7 +389,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
 
         <button
           onClick={onSetupComplete}
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="w-full px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
         >
           Done
         </button>

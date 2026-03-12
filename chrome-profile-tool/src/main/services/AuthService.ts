@@ -248,12 +248,17 @@ export class AuthService {
     return this.currentUser?.roles === '1' || this.currentUser?.isAdmin === true;
   }
 
+  isLeader(): boolean {
+    return this.currentUser?.roles === '2';
+  }
+
   isSeller(): boolean {
     return this.currentUser?.roles === '3' || this.currentUser?.isSeller === true;
   }
 
   getRoleName(): string {
     if (this.isAdmin()) return 'Admin';
+    if (this.isLeader()) return 'Leader';
     if (this.isSeller()) return 'Seller';
     return 'Unknown';
   }
@@ -261,6 +266,20 @@ export class AuthService {
   hasPermission(permission: string): boolean {
     if (this.isAdmin()) {
       return true; // Admin has all permissions
+    }
+
+    if (this.isLeader()) {
+      const leaderPermissions = [
+        'view_own_folders',
+        'view_own_profiles',
+        'create_profile',
+        'edit_profile',
+        'delete_profile',
+        'use_profile',
+        'manage_team',
+        'manage_team_folders'
+      ];
+      return leaderPermissions.includes(permission);
     }
 
     if (this.isSeller()) {

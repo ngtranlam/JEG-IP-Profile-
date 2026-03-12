@@ -215,7 +215,7 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Create Folder
@@ -253,7 +253,7 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
             {!searchTerm && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Create Folder
@@ -290,7 +290,7 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
                         e.stopPropagation();
                         handleEditFolder(folder);
                       }}
-                      className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                      className="p-1 text-gray-400 hover:text-orange-600 rounded"
                       title="Edit folder"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -376,7 +376,7 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Folder
               </button>
@@ -438,7 +438,7 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
               <button
                 onClick={handleUpdateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Update Folder
               </button>
