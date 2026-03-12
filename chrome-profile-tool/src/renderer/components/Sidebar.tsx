@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar, Eye, EyeOff } from 'lucide-react';
+import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar, Eye, EyeOff, Globe } from 'lucide-react';
 import iegLogo from '../assets/Layer2.png';
 import { TwoFactorSetup } from './TwoFactorSetup';
 
@@ -12,8 +12,8 @@ interface User {
 }
 
 interface SidebarProps {
-  activeView: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams';
-  onViewChange: (view: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams') => void;
+  activeView: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy';
+  onViewChange: (view: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy') => void;
   onLogout?: () => void;
   currentUser?: User | null;
 }
@@ -118,6 +118,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   const menuItems = [
     ...baseMenuItems,
     ...(isAdmin || isLeader ? [{ id: 'teams', label: 'Teams', icon: Users }] : []),
+    ...(isAdmin || isLeader ? [{ id: 'proxy', label: 'Proxy', icon: Globe }] : []),
     ...(isAdmin ? [
       { id: 'folders', label: 'Folders', icon: FolderOpen },
       { id: 'users', label: 'Users', icon: Users }
@@ -143,7 +144,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams')}
+                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy')}
                   className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground'

@@ -4,12 +4,13 @@ import { GoLoginProfileList } from './components/GoLoginProfileList';
 import { FolderListTable } from './components/FolderListTable';
 import { UserManagement } from './components/UserManagement';
 import { TeamManagement } from './components/TeamManagement';
+import { ProxyManagement } from './components/ProxyManagement';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { TwoFactorVerification } from './components/TwoFactorVerification';
 
-type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams';
+type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
@@ -222,6 +223,12 @@ function App() {
       case 'teams':
         return (
           <TeamManagement
+            currentUser={currentUser}
+          />
+        );
+      case 'proxy':
+        return (
+          <ProxyManagement
             currentUser={currentUser}
           />
         );
