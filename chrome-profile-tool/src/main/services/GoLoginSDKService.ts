@@ -331,12 +331,25 @@ export class GoLoginSDKService {
     this.browserMonitors.set(profileId, monitor);
   }
 
-  private handleBrowserClosed(profileId: string) {
+  private async handleBrowserClosed(profileId: string) {
     // Stop monitoring
     const monitor = this.browserMonitors.get(profileId);
     if (monitor) {
       clearInterval(monitor);
       this.browserMonitors.delete(profileId);
+    }
+
+    // Upload session data (tabs, cookies) to GoLogin server
+    // This is CRITICAL - without this, tabs are lost on next launch
+    const gologinInstance = this.activeGologinInstances.get(profileId);
+    if (gologinInstance) {
+      try {
+        console.log(`Browser closed for profile ${profileId}, uploading session data...`);
+        await gologinInstance.stop();
+        console.log(`Session data uploaded for profile ${profileId}`);
+      } catch (err) {
+        console.warn(`Failed to upload session for profile ${profileId}:`, err);
+      }
     }
 
     // Cleanup
@@ -365,40 +378,49 @@ export class GoLoginSDKService {
       const browserPid = this.browserPids.get(profileId);
       
       if (gologinInstance) {
-        try {
-          console.log(`Stopping profile ${profileId} via SDK...`);
-          
-          // Use GoLogin's stop method - it handles cookie upload internally
-          await gologinInstance.stop();
-          console.log(`Profile ${profileId} stopped - waiting for session upload...`);
-        } catch (err) {
-          console.warn(`Error stopping GoLogin instance:`, err);
-        }
-        
-        // Wait longer for session to upload to server
-        // This is critical for fast open/close cycles
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        console.log('Session upload completed');
-        
-        // Kill browser process
+        // Step 1: Close browser gracefully so Chrome flushes session files to disk
+        // This follows the same pattern as GoLogin SDK's killAndCommit():
+        // kill browser first → wait → then upload session data
         if (browserPid) {
           try {
-            process.kill(browserPid, 'SIGKILL');
-            console.log(`Browser process ${browserPid} killed`);
+            console.log(`Closing browser gracefully (SIGTERM) for profile ${profileId}...`);
+            process.kill(browserPid, 'SIGTERM');
+            
+            // Wait for browser to close (up to 5 seconds)
+            for (let i = 0; i < 10; i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              try {
+                process.kill(browserPid, 0); // Check if still alive
+              } catch {
+                console.log(`Browser process ${browserPid} closed gracefully`);
+                break;
+              }
+            }
+            
+            // Force kill if still alive after 5 seconds
+            try {
+              process.kill(browserPid, 0);
+              process.kill(browserPid, 'SIGKILL');
+              console.log(`Browser process ${browserPid} force killed`);
+            } catch {
+              // Already dead - good
+            }
           } catch (err: any) {
             if (err.code !== 'ESRCH') {
-              console.warn(`Error killing browser:`, err);
+              console.warn(`Error closing browser:`, err);
             }
           }
           this.browserPids.delete(profileId);
         }
         
-        // Cleanup any remaining processes
+        // Step 2: Upload session data via GoLogin SDK
+        // Browser is now closed, session files are flushed to disk
         try {
-          const { execSync } = require('child_process');
-          execSync(`pkill -9 -f "gologin_profile_${profileId}"`, { stdio: 'ignore' });
+          console.log(`Uploading session data for profile ${profileId}...`);
+          await gologinInstance.stop();
+          console.log(`Session data uploaded for profile ${profileId}`);
         } catch (err) {
-          // Ignore
+          console.warn(`Error uploading session for profile ${profileId}:`, err);
         }
         
         this.activeGologinInstances.delete(profileId);
@@ -418,47 +440,25 @@ export class GoLoginSDKService {
     try {
       console.log('Stopping all active profiles...');
       
-      const stopPromises = [];
-      for (const [profileId, gologinInstance] of this.activeGologinInstances.entries()) {
-        stopPromises.push(
-          (async () => {
-            try {
-              await gologinInstance.stop();
-              console.log(`Profile ${profileId} stopped and cookies uploaded`);
-            } catch (error) {
-              console.error(`Error stopping profile ${profileId}:`, error);
-            }
-            
-            // Kill browser process
-            const browserPid = this.browserPids.get(profileId);
-            if (browserPid) {
-              try {
-                process.kill(browserPid, 'SIGKILL');
-                console.log(`Browser process ${browserPid} killed for profile ${profileId}`);
-              } catch (err: any) {
-                if (err.code !== 'ESRCH') {
-                  console.warn(`Error killing browser process ${browserPid}:`, err);
-                }
-              }
-            }
-          })()
-        );
-      }
+      const profileIds = Array.from(this.activeGologinInstances.keys());
+      const stopPromises = profileIds.map(profileId =>
+        this.stopProfile(profileId).catch(err =>
+          console.error(`Error stopping profile ${profileId}:`, err)
+        )
+      );
       
       await Promise.allSettled(stopPromises);
       
-      // Kill all Orbita processes as final cleanup
-      try {
-        const { execSync } = require('child_process');
-        execSync('pkill -9 -f "Orbita"', { stdio: 'ignore' });
-        console.log('Killed all remaining Orbita processes');
-      } catch (err) {
-        // Ignore errors
-      }
-      
+      // Final cleanup in case any were missed
       this.activeGologinInstances.clear();
       this.activeBrowsers.clear();
       this.browserPids.clear();
+      
+      // Clear all monitors
+      for (const monitor of this.browserMonitors.values()) {
+        clearInterval(monitor);
+      }
+      this.browserMonitors.clear();
       
       console.log('All profiles stopped');
     } catch (error) {
