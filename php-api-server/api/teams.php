@@ -31,15 +31,15 @@ try {
     $token = $authMiddleware->getAuthToken();
     $user = $authMiddleware->authenticate($token);
 
-    // Only Admin and Leader can access teams
-    if ($user['roles'] !== '1' && $user['roles'] !== '2') {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Access denied. Admin or Leader role required.']);
-        exit();
-    }
+    // Role-based access control
+    $isAdmin = $user['roles'] === '1';
+    $isLeader = $user['roles'] === '2';
+    $isSeller = $user['roles'] === '3';
 
     switch ($method) {
         case 'GET':
+            // Sellers can only view their own team (GET requests)
+            // Admin and Leader have full access
             if (!$teamId) {
                 // GET /api/teams - List all teams
                 $teams = $teamService->getTeams($user);
@@ -62,6 +62,13 @@ try {
             break;
 
         case 'POST':
+            // Only Admin and Leader can create/modify teams
+            if (!$isAdmin && !$isLeader) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Access denied. Admin or Leader role required.']);
+                exit();
+            }
+
             $input = json_decode(file_get_contents('php://input'), true);
 
             if (!$teamId) {
@@ -102,6 +109,13 @@ try {
             break;
 
         case 'PUT':
+            // Only Admin and Leader can modify teams
+            if (!$isAdmin && !$isLeader) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Access denied. Admin or Leader role required.']);
+                exit();
+            }
+
             $input = json_decode(file_get_contents('php://input'), true);
 
             if ($teamId && !$action) {
@@ -122,6 +136,13 @@ try {
             break;
 
         case 'DELETE':
+            // Only Admin and Leader can delete teams/members
+            if (!$isAdmin && !$isLeader) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Access denied. Admin or Leader role required.']);
+                exit();
+            }
+
             if ($teamId && $action === 'members' && $actionParam) {
                 // DELETE /api/teams/{id}/members/{userId} - Remove member
                 $teamService->removeMember($teamId, (int)$actionParam, $user);

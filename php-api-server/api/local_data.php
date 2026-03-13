@@ -695,12 +695,6 @@ try {
                 
             } elseif ($action === 'proxy_order') {
                 // Place proxy order via external API
-                // Only Admin and Leader can place orders
-                if ($user['roles'] !== '1' && $user['roles'] !== '2') {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Only Admin and Leader can place proxy orders']);
-                    exit();
-                }
                 
                 $extProxy = new ExternalProxyService();
                 $username = $user['userName'];
