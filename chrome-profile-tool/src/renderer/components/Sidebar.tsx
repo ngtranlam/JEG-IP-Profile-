@@ -112,13 +112,13 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   const baseMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profiles', label: 'Profiles', icon: Cloud },
+    { id: 'proxy', label: 'Proxy', icon: Globe },
   ];
   
   // Add tabs based on role
   const menuItems = [
     ...baseMenuItems,
     ...(isAdmin || isLeader ? [{ id: 'teams', label: 'Teams', icon: Users }] : []),
-    ...(isAdmin || isLeader ? [{ id: 'proxy', label: 'Proxy', icon: Globe }] : []),
     ...(isAdmin ? [
       { id: 'folders', label: 'Folders', icon: FolderOpen },
       { id: 'users', label: 'Users', icon: Users }

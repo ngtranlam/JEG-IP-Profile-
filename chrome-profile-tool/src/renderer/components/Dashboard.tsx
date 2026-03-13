@@ -25,6 +25,7 @@ interface DashboardProps {
 
 // SVG Donut Chart component for Profile Overview
 function DonutChart({ running, available, total }: { running: number; available: number; total: number }) {
+  const [isHovered, setIsHovered] = React.useState(false);
   const size = 120;
   const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
@@ -34,14 +35,20 @@ function DonutChart({ running, available, total }: { running: number; available:
   const availableDash = circumference - runningDash;
 
   return (
-    <div className="relative inline-flex items-center justify-center">
+    <div 
+      className="relative inline-flex items-center justify-center cursor-pointer transition-transform duration-300 ease-out hover:scale-110"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => console.log(`Profile stats: ${running} running / ${total} total`)}
+      style={{ filter: isHovered ? 'drop-shadow(0 4px 12px rgba(249, 115, 22, 0.3))' : 'none' }}
+    >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f97316" strokeWidth={strokeWidth}
           strokeDasharray={`${runningDash} ${availableDash}`} strokeLinecap="round" className="transition-all duration-700 ease-out" />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-bold text-gray-900">{running}</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className={`text-xl font-bold text-gray-900 transition-all duration-300 ${isHovered ? 'scale-110' : ''}`}>{running}</span>
         <span className="text-[9px] text-gray-400 uppercase tracking-wider font-medium">Running</span>
       </div>
     </div>
@@ -50,13 +57,14 @@ function DonutChart({ running, available, total }: { running: number; available:
 
 // Filled Pie Chart for Proxy Status (active, expiring, inactive) with percentage labels
 function ProxyStatusChart({ active, expiring, inactive }: { active: number; expiring: number; inactive: number }) {
+  const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
   const total = active + expiring + inactive;
-  const size = 280;
+  const size = 200;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 105;
+  const radius = 75;
   const labelRadius = radius * 0.65;
-  const outerLabelRadius = radius + 28;
+  const outerLabelRadius = radius + 24;
 
   const segments = [
     { value: active, color: '#10b981', label: 'Active' },
@@ -108,17 +116,41 @@ function ProxyStatusChart({ active, expiring, inactive }: { active: number; expi
           <filter id="pieShadow" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.1" />
           </filter>
+          <filter id="pieShadowHover" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.25" />
+          </filter>
         </defs>
-        <g filter="url(#pieShadow)">
-          {slices.map((slice, i) => (
-            <path key={i} d={slice.path} fill={slice.color} className="transition-all duration-700 ease-out" stroke="white" strokeWidth="2" />
-          ))}
-        </g>
+        {slices.map((slice, i) => {
+          const isHovered = hoveredIndex === i;
+          const scale = isHovered ? 1.08 : 1;
+          const translateX = isHovered ? (slice.outerX - cx) * 0.08 : 0;
+          const translateY = isHovered ? (slice.outerY - cy) * 0.08 : 0;
+          return (
+            <g
+              key={i}
+              transform={`translate(${translateX}, ${translateY}) scale(${scale}) translate(${-translateX}, ${-translateY})`}
+              style={{ transformOrigin: `${cx}px ${cy}px`, cursor: 'pointer' }}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              onClick={() => console.log(`Clicked ${slice.label}: ${slice.value}`)}
+              className="transition-all duration-300 ease-out"
+            >
+              <path
+                d={slice.path}
+                fill={slice.color}
+                stroke="white"
+                strokeWidth="2"
+                filter={isHovered ? 'url(#pieShadowHover)' : 'url(#pieShadow)'}
+                style={{ opacity: isHovered ? 0.95 : 1 }}
+              />
+            </g>
+          );
+        })}
         {/* Percentage labels inside slices */}
         {slices.map((slice, i) => (
           slice.pct >= 0.05 && (
             <text key={`pct-${i}`} x={slice.labelX} y={slice.labelY} textAnchor="middle" dominantBaseline="central"
-              fill="white" fontSize="16" fontWeight="700" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+              fill="white" fontSize="12" fontWeight="700" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
               {Math.round(slice.pct * 100)}%
             </text>
           )
@@ -128,7 +160,7 @@ function ProxyStatusChart({ active, expiring, inactive }: { active: number; expi
           const anchor = slice.outerX > cx ? 'start' : slice.outerX < cx ? 'end' : 'middle';
           return (
             <text key={`lbl-${i}`} x={slice.outerX} y={slice.outerY} textAnchor={anchor} dominantBaseline="central"
-              fill="#374151" fontSize="12" fontWeight="600">
+              fill="#374151" fontSize="10" fontWeight="600">
               {slice.label}
             </text>
           );
@@ -483,31 +515,25 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
         {/* Stats Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
-          {/* Running Profiles - Hero Card */}
+          {/* Total Folders - Hero Card */}
           <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 text-white shadow-lg shadow-orange-200/50">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
             <div className="relative">
               <div className="flex items-center gap-1.5 mb-3">
-                {runningCount > 0 && (
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-                  </span>
-                )}
-                <span className="text-sm font-medium text-orange-100">Running Now</span>
+                <span className="text-sm font-medium text-orange-100">Total Folders</span>
               </div>
               <div className="flex items-end gap-2">
-                <span className="text-4xl font-bold leading-none">{runningCount}</span>
-                <span className="text-orange-200 text-sm mb-0.5">profiles</span>
+                <span className="text-4xl font-bold leading-none">{folders.length}</span>
+                <span className="text-orange-200 text-sm mb-0.5">folders</span>
               </div>
               <div className="mt-3 bg-white/20 rounded-full h-1.5 overflow-hidden">
                 <div
                   className="bg-white rounded-full h-1.5 transition-all duration-500"
-                  style={{ width: `${totalCount > 0 ? Math.round((runningCount / totalCount) * 100) : 0}%` }}
+                  style={{ width: `${folders.length > 0 ? '100' : '0'}%` }}
                 />
               </div>
-              <p className="text-orange-100 text-xs mt-1.5">{runningCount} of {totalCount} profiles active</p>
+              <p className="text-orange-100 text-xs mt-1.5">Organizing your profiles</p>
             </div>
           </div>
 
@@ -573,10 +599,116 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
           )}
         </div>
 
-        {/* Content Grid: 3 columns, fill remaining height */}
+        {/* Row 2: Folders (2/3) + Profiles Overview (1/3) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+          {/* Folders - takes 2 columns */}
+          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+            <div
+              className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+              onClick={() => onViewChange?.('folders')}
+            >
+              <h2 className="text-sm font-semibold text-gray-900">Folders</h2>
+              <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                View all <ChevronRight className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            {folders.length > 0 ? (
+              <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                {folders.slice(0, 10).map((folder, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-orange-50/50 transition-colors cursor-pointer group"
+                    onClick={() => onSelectFolder?.(folder.id)}
+                  >
+                    <div className="w-7 h-7 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
+                      <FolderOpen className="w-3.5 h-3.5 text-orange-600" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate flex-1 group-hover:text-orange-700 transition-colors">
+                      {folder.name || `Folder ${index + 1}`}
+                    </p>
+                    <span className="text-xs text-gray-400 flex-shrink-0">{folder.profilesCount || 0} profiles</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center px-5">
+                <FolderOpen className="h-8 w-8 text-gray-300 mb-2" />
+                <p className="text-xs text-gray-400">No folders</p>
+              </div>
+            )}
+          </div>
 
-          {/* Col 1: Proxy Status Chart */}
+          {/* Profiles Overview - takes 1 column */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Profiles Overview</h2>
+            <div className="flex-1 flex items-center justify-center">
+              <DonutChart running={runningCount} available={availableCount} total={totalCount} />
+            </div>
+            <div className="flex items-center justify-center gap-4 text-xs mt-3">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                <span className="text-gray-600">Running ({runningCount})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
+                <span className="text-gray-600">Available ({availableCount})</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Expiring Soon (2/3) + Proxy Status (1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+          {/* Expiring Soon - takes 2 columns */}
+          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+            <div
+              className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+              onClick={() => onViewChange?.('proxy')}
+            >
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Expiring Soon
+              </h2>
+              <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                View all <ChevronRight className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            {expiringProxies.length > 0 ? (
+              <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                {expiringProxies.map((proxy, idx) => {
+                  const proxyId = proxy.id || proxy.proxy_id;
+                  const ip = proxy.public_ip || proxy.publicIp || '';
+                  const expires = proxy.expires_formatted || proxy.expires_at || proxy.expires || '';
+                  const seller = proxy.seller_full_name || proxy.seller_username || proxy.name || '';
+                  return (
+                    <div key={proxyId || idx} className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-50/50 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900 font-mono truncate">{ip || proxyId}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-amber-600 font-medium">{formatExpiry(expires)}</p>
+                          {isAdmin && seller && (
+                            <span className="text-xs text-gray-400">• {seller}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openExtendModal(proxy); }}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors flex-shrink-0 ml-2"
+                      >
+                        <Clock className="w-3.5 h-3.5" /> Extend
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center px-5">
+                <Shield className="h-8 w-8 text-gray-300 mb-2" />
+                <p className="text-xs text-gray-400">No proxies expiring soon</p>
+              </div>
+            )}
+          </div>
+
+          {/* Proxy Status - takes 1 column */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col">
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Proxy Status</h2>
             <div className="flex-1 flex items-center justify-center">
@@ -608,113 +740,6 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
                 </div>
                 <span className="text-xs font-bold text-gray-900">{proxyStats.inactive}</span>
               </div>
-            </div>
-          </div>
-
-          {/* Col 2: Expiring Soon Proxies */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
-            <div
-              className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
-              onClick={() => onViewChange?.('proxy')}
-            >
-              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Expiring Soon
-              </h2>
-              <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                View all <ChevronRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            {expiringProxies.length > 0 ? (
-              <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
-                {expiringProxies.map((proxy, idx) => {
-                  const proxyId = proxy.id || proxy.proxy_id;
-                  const ip = proxy.public_ip || proxy.publicIp || '';
-                  const expires = proxy.expires_formatted || proxy.expires_at || proxy.expires || '';
-                  const seller = proxy.seller_full_name || proxy.seller_username || proxy.name || '';
-                  return (
-                    <div key={proxyId || idx} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50/50 transition-colors">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 font-mono truncate">{ip || proxyId}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs text-amber-600 font-medium">{formatExpiry(expires)}</p>
-                          {isAdmin && seller && (
-                            <span className="text-xs text-gray-400">• {seller}</span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openExtendModal(proxy); }}
-                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors flex-shrink-0 ml-2"
-                      >
-                        <Clock className="w-3.5 h-3.5" /> Extend
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center px-5">
-                <Shield className="h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-xs text-gray-400">No proxies expiring soon</p>
-              </div>
-            )}
-          </div>
-
-          {/* Col 3: Profile Overview + Folders */}
-          <div className="flex flex-col gap-4 min-h-0">
-            {/* Profile Overview Chart */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex-shrink-0">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">Profile Overview</h2>
-              <div className="flex items-center justify-center mb-2">
-                <DonutChart running={runningCount} available={availableCount} total={totalCount} />
-              </div>
-              <div className="flex items-center justify-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-orange-500" />
-                  <span className="text-gray-600">Running ({runningCount})</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-gray-200" />
-                  <span className="text-gray-600">Available ({availableCount})</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Folders section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col flex-1 min-h-0">
-              <div
-                className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
-                onClick={() => onViewChange?.('folders')}
-              >
-                <h2 className="text-sm font-semibold text-gray-900">Folders</h2>
-                <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                  View all <ChevronRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              {folders.length > 0 ? (
-                <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
-                  {folders.slice(0, 10).map((folder, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2.5 px-4 py-2 hover:bg-orange-50/50 transition-colors cursor-pointer group"
-                      onClick={() => onSelectFolder?.(folder.id)}
-                    >
-                      <div className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
-                        <FolderOpen className="w-3 h-3 text-orange-600" />
-                      </div>
-                      <p className="text-xs font-medium text-gray-900 truncate flex-1 group-hover:text-orange-700 transition-colors">
-                        {folder.name || `Folder ${index + 1}`}
-                      </p>
-                      <span className="text-[10px] text-gray-400 flex-shrink-0">{folder.profilesCount || 0}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center px-4">
-                  <FolderOpen className="h-7 w-7 text-gray-300 mb-1.5" />
-                  <p className="text-xs text-gray-400">No folders</p>
-                </div>
-              )}
             </div>
           </div>
         </div>

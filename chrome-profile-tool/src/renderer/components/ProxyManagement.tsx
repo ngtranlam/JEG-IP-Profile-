@@ -17,6 +17,7 @@ interface Proxy {
   expires: string;
   status: 'active' | 'expiring' | 'inactive';
   location: string;
+  country: string;
   countryFlag: string;
   isp: string;
   username: string;
@@ -96,6 +97,15 @@ function mapApiStatus(rawStatus: string): 'active' | 'expiring' | 'inactive' {
   return 'inactive';
 }
 
+// Helper function to get country flag emoji from country code
+function getCountryFlag(countryCode: string | undefined): string {
+  if (!countryCode) return '🌐';
+  const code = countryCode.toUpperCase();
+  // Convert country code to flag emoji using regional indicator symbols
+  const codePoints = [...code].map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 function mapApiProxy(p: any): Proxy {
   return {
     id: p.id || p.proxy_id || '',
@@ -113,6 +123,7 @@ function mapApiProxy(p: any): Proxy {
     expires: p.expires_formatted || p.expires_at || '',
     status: mapApiStatus(p.status || p.raw_status || ''),
     location: p.country_code || '',
+    country: p.country_code || '',
     countryFlag: p.country_flag || countryFlags[p.country_code] || '',
     isp: p.isp_name || '',
     username: p.username || '',
@@ -938,24 +949,20 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
             <p className="text-[11px] text-gray-400">Total Monthly Cost</p>
             <p className="text-lg font-bold text-gray-900">${totalMonthlyCost.toFixed(2)}</p>
           </div>
-          {(isAdmin || isLeader) && (
-            <>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Proxy
-              </button>
-              <button
-                onClick={openOrderModal}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-xs font-medium"
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                Order Proxy
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-medium"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Proxy
+          </button>
+          <button
+            onClick={openOrderModal}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-xs font-medium"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            Order Proxy
+          </button>
         </div>
       </div>
 
@@ -1210,7 +1217,7 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   </td>
                   <td className="px-2 py-2.5">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${proxy.status === 'active' ? 'bg-green-500' : proxy.status === 'expiring' ? 'bg-orange-400' : 'bg-red-500'}`} />
+                      <span className="text-base flex-shrink-0" title={proxy.country || 'Unknown'}>{getCountryFlag(proxy.country)}</span>
                       <span className="text-xs font-medium text-gray-900 truncate" title={proxy.proxyId}>{proxy.proxyId}</span>
                     </div>
                   </td>
@@ -1366,12 +1373,13 @@ export function ProxyManagement({ currentUser }: ProxyManagementProps) {
                   <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Location <span className="text-red-500">*</span></label>
                   <select value={addProxyLocation} onChange={(e) => setAddProxyLocation(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white">
                     <option value="">Select Location</option>
-                    <option value="US">🇺🇸 United States</option>
-                    <option value="UK">🇬🇧 United Kingdom</option>
-                    <option value="DE">🇩🇪 Germany</option>
-                    <option value="FR">🇫🇷 France</option>
-                    <option value="CA">🇨🇦 Canada</option>
-                    <option value="AU">🇦🇺 Australia</option>
+                    {Object.entries(countryNames)
+                      .filter(([code]) => code !== 'GB')
+                      .sort((a, b) => a[1].localeCompare(b[1]))
+                      .map(([code, name]) => (
+                        <option key={code} value={code}>{countryFlags[code] || getCountryFlag(code)} {name}</option>
+                      ))
+                    }
                   </select>
                 </div>
                 <div>

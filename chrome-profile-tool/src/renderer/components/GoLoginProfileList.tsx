@@ -1098,41 +1098,46 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
         ) : (
           <div className="min-w-full">
             {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-xs font-medium text-gray-700 uppercase tracking-wider">
-              <div className="col-span-2 flex items-center gap-2">
-                <span>Name</span>
-                <div className="flex flex-col">
-                  <button className="text-gray-400 hover:text-gray-600">↑</button>
-                  <button className="text-gray-400 hover:text-gray-600">↓</button>
-                </div>
-                <Plus className="w-3 h-3 text-gray-400" />
-              </div>
-              <div className="col-span-2">State</div>
-              <div className="col-span-2">Seller</div>
-              <div className="col-span-2">Notes</div>
-              <div className="col-span-3">Location</div>
-              <div className="col-span-1"></div>
-            </div>
+            <table className="w-full table-fixed">
+            <thead className="bg-gray-50 border-b sticky top-0 z-10">
+              <tr className="text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="w-[30px] px-2 py-3 text-left">#</th>
+                <th className="w-[20%] px-2 py-3 text-left">
+                  <div className="flex items-center gap-2">
+                    <span>Name</span>
+                    <div className="flex flex-col">
+                      <button className="text-gray-400 hover:text-gray-600">↑</button>
+                      <button className="text-gray-400 hover:text-gray-600">↓</button>
+                    </div>
+                    <Plus className="w-3 h-3 text-gray-400" />
+                  </div>
+                </th>
+                <th className="w-[12%] px-2 py-3 text-left">State</th>
+                <th className="w-[18%] px-2 py-3 text-left">Seller</th>
+                <th className="w-[22%] px-2 py-3 text-left">Notes</th>
+                <th className="w-[18%] px-2 py-3 text-left">Location</th>
+                <th className="w-[70px] px-2 py-3"></th>
+              </tr>
+            </thead>
 
-            {/* Table Body */}
-            <div className="divide-y divide-gray-100">
-              {profiles.map((profile) => {
-                // Debug: log first profile to check folder_names
-                if (profiles.indexOf(profile) === 0) {
-                  console.log('Profile data:', profile);
-                  console.log('folder_names:', (profile as any).folder_names);
-                }
+            <tbody className="divide-y divide-gray-100">
+              {profiles.map((profile, index) => {
                 return (
-                <div key={profile.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
+                <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
+                  {/* Row Number */}
+                  <td className="px-2 py-3">
+                    <span className="text-xs text-gray-500">{index + 1}</span>
+                  </td>
                   {/* Name */}
-                  <div className="col-span-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">
+                  <td className="px-2 py-3">
+                    <span className="text-sm font-medium text-gray-900 truncate block">
                       {profile.name}
                     </span>
-                  </div>
+                  </td>
 
                   {/* State */}
-                  <div className="col-span-2 flex items-center gap-2">
+                  <td className="px-2 py-3">
+                    <div className="flex items-center gap-2">
                     {(() => {
                       const isRunning = runningProfiles.has(profile.id);
                       const isChecking = checkingProfiles.has(profile.id);
@@ -1187,17 +1192,19 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                         </>
                       );
                     })()}
-                  </div>
+                    </div>
+                  </td>
 
                   {/* Seller */}
-                  <div className="col-span-2 flex items-center overflow-hidden">
-                    <span className="text-xs text-gray-600 truncate" title={(profile as any).folder_names || '-'}>
+                  <td className="px-2 py-3">
+                    <span className="text-xs text-gray-600 truncate block" title={(profile as any).folder_names || '-'}>
                       {(profile as any).folder_names || '-'}
                     </span>
-                  </div>
+                  </td>
 
                   {/* Notes */}
-                  <div className="col-span-2 flex items-center">
+                  <td className="px-2 py-3">
+                    <div className="min-w-0">
                     {editingNoteId === profile.id ? (
                       <input
                         type="text"
@@ -1214,13 +1221,15 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                         className="text-xs text-orange-600 truncate cursor-pointer hover:bg-orange-50 px-2 py-1 rounded w-full"
                         title="Double-click to edit"
                       >
-                        {profile.notes || 'select text for formatting...'}
+                        {profile.notes ? profile.notes.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").trim() : 'select text for formatting...'}
                       </span>
                     )}
-                  </div>
+                    </div>
+                  </td>
 
                   {/* Location */}
-                  <div className="col-span-3 flex items-center gap-2">
+                  <td className="px-2 py-3">
+                    <div className="flex items-center gap-2 overflow-hidden">
                     {(() => {
                       // Check proxy mode and get location
                       if (!profile.proxy || profile.proxy.mode === 'none') {
@@ -1307,10 +1316,12 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                         </>
                       );
                     })()}
-                  </div>
+                    </div>
+                  </td>
 
                   {/* Actions */}
-                  <div className="col-span-1 flex items-center justify-end gap-2">
+                  <td className="px-2 py-3">
+                    <div className="flex items-center justify-end gap-2">
                     {!isSeller && (
                       <button
                         onClick={() => handleOpenFolderManager(profile.id)}
@@ -1338,11 +1349,13 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                  </div>
-                </div>
+                    </div>
+                  </td>
+                </tr>
                 );
               })}
-            </div>
+            </tbody>
+            </table>
           </div>
         )}
       </div>

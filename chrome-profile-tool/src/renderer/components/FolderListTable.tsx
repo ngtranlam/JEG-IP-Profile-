@@ -264,6 +264,9 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
           <table className="w-full">
             <thead className="bg-gray-50 border-b sticky top-0">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  #
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Folder Name
                 </th>
@@ -284,8 +287,11 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredFolders.map((folder) => (
+              {filteredFolders.map((folder, index) => (
                 <tr key={folder.folder_id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {index + 1}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="text-sm font-medium text-gray-900">
@@ -296,7 +302,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {folder.seller_name ? (
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-xs border border-orange-200">
                           <User className="w-3 h-3" />
                           {folder.seller_name}
                         </div>

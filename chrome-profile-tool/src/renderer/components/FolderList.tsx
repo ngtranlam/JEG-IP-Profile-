@@ -262,15 +262,18 @@ export function FolderList({ onFolderSelect }: FolderListProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredFolders.map((folder) => (
+            {filteredFolders.map((folder, index) => (
               <div
                 key={folder.id}
-                className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer relative ${
                   selectedFolder === folder.id ? 'ring-2 ring-blue-500 border-blue-200' : ''
                 }`}
                 onClick={() => handleFolderSelect(folder.id)}
               >
-                <div className="flex items-start justify-between mb-3">
+                <div className="absolute top-2 left-2 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-medium text-gray-600">{index + 1}</span>
+                </div>
+                <div className="flex items-start justify-between mb-3 ml-8">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${folder.color}`}>
                       <Folder className="w-5 h-5" />
