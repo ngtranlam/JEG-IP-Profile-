@@ -208,11 +208,11 @@ export class GoLoginSDKService {
         extraParams = ['--headless'];
       } else {
         // Common flags for all platforms (no window sizing flags)
+        // NOTE: Multiple --disable-features flags won't work - Chrome only uses the last one
+        // So we combine them into a single flag
         const commonFlags = [
-          '--disable-features=RendererCodeIntegrity',
+          '--disable-features=RendererCodeIntegrity,VizDisplayCompositor',
           '--disable-blink-features=AutomationControlled',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
           '--disable-backgrounding-occluded-windows'
@@ -247,7 +247,7 @@ export class GoLoginSDKService {
         tmpdir: this.tmpDir,
         extra_params: extraParams,
         uploadCookiesToServer: true,
-        writeCookesFromServer: true,
+        writeCookiesFromServer: true,
         autoUpdateBrowser: false,
         restoreLastSession: true,
       });
@@ -303,7 +303,9 @@ export class GoLoginSDKService {
   private startBrowserMonitoring(profileId: string, gologinInstance: any) {
     const childProcess = gologinInstance.processSpawned;
     if (!childProcess || !childProcess.pid) {
-      console.warn(`No browser process found for profile ${profileId}, using fallback polling`);
+      console.warn(`No browser process found for profile ${profileId}, setting up fallback polling`);
+      // Fallback: poll wsUrl connectivity to detect browser close
+      this.startFallbackPolling(profileId, gologinInstance);
       return;
     }
 
@@ -323,6 +325,39 @@ export class GoLoginSDKService {
 
     // Store reference so we can remove listener if needed
     this.browserMonitors.set(profileId, { removeListener: () => childProcess.removeListener('exit', onExit) } as any);
+  }
+
+  private startFallbackPolling(profileId: string, gologinInstance: any) {
+    // Poll every 3 seconds to check if browser is still running
+    const interval = setInterval(async () => {
+      // If profile was already stopped programmatically, stop polling
+      if (!this.activeGologinInstances.has(profileId)) {
+        clearInterval(interval);
+        this.browserMonitors.delete(profileId);
+        return;
+      }
+
+      try {
+        // Check if browser process is still alive by checking the PID from GoLogin instance
+        const pid = gologinInstance.processSpawned?.pid || gologinInstance.browserPid;
+        if (pid) {
+          try {
+            // process.kill(pid, 0) throws if process doesn't exist
+            process.kill(pid, 0);
+          } catch {
+            // Process not found - browser was closed
+            console.log(`Fallback polling: browser process ${pid} not found for profile ${profileId}`);
+            clearInterval(interval);
+            this.browserMonitors.delete(profileId);
+            this.handleBrowserClosed(profileId);
+          }
+        }
+      } catch (err) {
+        console.warn(`Fallback polling error for profile ${profileId}:`, err);
+      }
+    }, 3000);
+
+    this.browserMonitors.set(profileId, interval);
   }
 
   private async handleBrowserClosed(profileId: string) {

@@ -497,11 +497,21 @@ declare global {
         getCurrentUser: () => Promise<any>;
         isAuthenticated: () => Promise<boolean>;
         changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+        forceChangePassword: (userName: string, currentPassword: string, newPassword: string) => Promise<void>;
+        sendPasswordResetEmail: (email: string) => Promise<void>;
         getUserPermissions: () => Promise<any>;
         isAdmin: () => Promise<boolean>;
         isSeller: () => Promise<boolean>;
         getRoleName: () => Promise<string>;
         hasPermission: (permission: string) => Promise<boolean>;
+        generate2FASecret: () => Promise<any>;
+        enable2FA: (verificationCode: string) => Promise<any>;
+        verify2FA: (userName: string, verificationCode: string) => Promise<any>;
+        disable2FA: () => Promise<void>;
+        is2FAEnabled: () => Promise<boolean>;
+        saveCredentials: (userName: string, password: string) => Promise<void>;
+        clearSavedCredentials: () => Promise<void>;
+        getSavedCredentials: () => Promise<{ userName: string; password: string } | null>;
       };
     };
   }

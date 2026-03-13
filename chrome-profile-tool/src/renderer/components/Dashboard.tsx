@@ -183,8 +183,19 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
   const globalPollingRef = useRef<NodeJS.Timeout | null>(null);
   const fullFetchDone = useRef(false);
   
-  // Check if user is Admin (roles="1")
+  // Check if user is Admin (roles="1") or Leader (roles="2")
   const isAdmin = currentUser?.roles === '1';
+  const isLeader = currentUser?.roles === '2';
+  const isSeller = !isAdmin && !isLeader;
+  
+  // Leader-specific state
+  const [teamData, setTeamData] = useState<any>(null);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<any[]>([]);
+  
+  // Seller-specific state
+  const [sellerTeamData, setSellerTeamData] = useState<any>(null);
+  const [sellerLeaderName, setSellerLeaderName] = useState<string>('');
 
   // Realtime polling for local running profiles (this machine)
   const fetchRunningProfiles = useCallback(async () => {
@@ -340,6 +351,74 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
         }
       } else {
         setFolders([]);
+      }
+      
+      // Load team data for Leader
+      if (isLeader) {
+        try {
+          console.log('[Leader Dashboard] Fetching team data for user:', currentUser);
+          const teams = await window.electronAPI.teamsGetList();
+          console.log('[Leader Dashboard] Teams list:', teams);
+          
+          // Leader should have exactly one team they lead
+          const myTeam = teams?.find((t: any) => t.leader_id === currentUser?.id);
+          console.log('[Leader Dashboard] My team:', myTeam);
+          
+          if (myTeam) {
+            setTeamData(myTeam);
+            
+            // Get team members
+            const members = await window.electronAPI.teamsGetMembers(myTeam.id);
+            console.log('[Leader Dashboard] Team members:', members);
+            setTeamMembers(members || []);
+            
+            // Get all profiles for team (simplified approach)
+            // Since member folders might not be assigned yet, we'll show all profiles
+            console.log('[Leader Dashboard] Fetching all profiles for team');
+            const allProfilesData = await window.electronAPI.localDataGetProfiles(1, 100);
+            console.log('[Leader Dashboard] All profiles:', allProfilesData);
+            
+            if (allProfilesData?.profiles) {
+              // Map profiles with member info if available
+              const mappedProfiles = allProfilesData.profiles.map((p: any) => ({
+                ...p,
+                member_name: 'Team Member',
+                folder_name: p.folder_name || 'Default'
+              }));
+              console.log('[Leader Dashboard] Total member profiles:', mappedProfiles.length);
+              setMemberProfiles(mappedProfiles);
+            } else {
+              setMemberProfiles([]);
+            }
+          } else {
+            console.warn('[Leader Dashboard] No team found for current user');
+          }
+        } catch (error) {
+          console.error('[Leader Dashboard] Failed to load team data:', error);
+        }
+      }
+      
+      // Load team data for Seller
+      if (isSeller) {
+        try {
+          console.log('[Seller Dashboard] Fetching team data for seller');
+          const teams = await window.electronAPI.teamsGetList();
+          console.log('[Seller Dashboard] Teams list:', teams);
+          
+          if (teams && teams.length > 0) {
+            // Get the first team (seller should only be in one team)
+            const team = teams[0];
+            setSellerTeamData(team);
+            
+            // Leader name is already in the team data from API
+            const leaderName = team.leaderName || team.leaderUserName || 'Leader';
+            setSellerLeaderName(leaderName);
+            
+            console.log('[Seller Dashboard] Team:', team.name, 'Leader:', leaderName);
+          }
+        } catch (error) {
+          console.error('[Seller Dashboard] Failed to load team data:', error);
+        }
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -513,130 +592,362 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
         </div>
 
         {/* Stats Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          {/* Total Folders - Hero Card */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 text-white shadow-lg shadow-orange-200/50">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
-            <div className="relative">
-              <div className="flex items-center gap-1.5 mb-3">
-                <span className="text-sm font-medium text-orange-100">Total Folders</span>
-              </div>
-              <div className="flex items-end gap-2">
-                <span className="text-4xl font-bold leading-none">{folders.length}</span>
-                <span className="text-orange-200 text-sm mb-0.5">folders</span>
-              </div>
-              <div className="mt-3 bg-white/20 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-white rounded-full h-1.5 transition-all duration-500"
-                  style={{ width: `${folders.length > 0 ? '100' : '0'}%` }}
-                />
-              </div>
-              <p className="text-orange-100 text-xs mt-1.5">Organizing your profiles</p>
-            </div>
-          </div>
-
-          {/* Total Profiles */}
-          <div
-            className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
-            onClick={() => onViewChange?.('profiles')}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="bg-orange-50 p-2.5 rounded-lg group-hover:bg-orange-100 transition-colors">
-                <Globe className="h-5 w-5 text-orange-600" />
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
-            </div>
-            <p className="text-sm text-gray-500 mb-0.5">Total Profiles</p>
-            <p className="text-3xl font-bold text-gray-900">{totalCount}</p>
-            <p className="text-xs text-gray-400 mt-1">Click to view all</p>
-          </div>
-
-          {/* Total Proxy */}
-          <div
-            className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
-            onClick={() => onViewChange?.('proxy')}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="bg-emerald-50 p-2.5 rounded-lg group-hover:bg-emerald-100 transition-colors">
-                <Shield className="h-5 w-5 text-emerald-600" />
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
-            </div>
-            <p className="text-sm text-gray-500 mb-0.5">Total Proxy</p>
-            <p className="text-3xl font-bold text-gray-900">{proxyStats.total}</p>
-            <p className="text-xs text-gray-400 mt-1">{proxyStats.active} active • {proxyStats.expiring_soon} expiring</p>
-          </div>
-
-          {/* Total Users (Admin) / Folders (Seller) */}
-          {isAdmin ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-orange-50 p-2.5 rounded-lg">
-                  <Users className="h-5 w-5 text-orange-500" />
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 mb-0.5">Total Users</p>
-              <p className="text-3xl font-bold text-gray-900">{userCount}</p>
-              <p className="text-xs text-gray-400 mt-1">System accounts</p>
-            </div>
-          ) : (
+        {isLeader ? (
+          // Leader: 3 cards - Total Profiles, Total Proxy, Team Info
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Total Profiles */}
             <div
               className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
-              onClick={() => onViewChange?.('folders')}
+              onClick={() => onViewChange?.('profiles')}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="bg-orange-50 p-2.5 rounded-lg group-hover:bg-orange-100 transition-colors">
-                  <FolderOpen className="h-5 w-5 text-orange-500" />
+                  <Globe className="h-5 w-5 text-orange-600" />
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
               </div>
-              <p className="text-sm text-gray-500 mb-0.5">Folders</p>
-              <p className="text-3xl font-bold text-gray-900">{folders.length}</p>
-              <p className="text-xs text-gray-400 mt-1">Profile groups</p>
+              <p className="text-sm text-gray-500 mb-0.5">Total Profiles</p>
+              <p className="text-3xl font-bold text-gray-900">{totalCount}</p>
+              <p className="text-xs text-gray-400 mt-1">Click to view all</p>
             </div>
-          )}
-        </div>
 
-        {/* Row 2: Folders (2/3) + Profiles Overview (1/3) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-          {/* Folders - takes 2 columns */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+            {/* Total Proxy */}
             <div
-              className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
-              onClick={() => onViewChange?.('folders')}
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
+              onClick={() => onViewChange?.('proxy')}
             >
-              <h2 className="text-sm font-semibold text-gray-900">Folders</h2>
-              <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                View all <ChevronRight className="w-3.5 h-3.5" />
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-emerald-50 p-2.5 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
               </div>
+              <p className="text-sm text-gray-500 mb-0.5">Total Proxy</p>
+              <p className="text-3xl font-bold text-gray-900">{proxyStats.total}</p>
+              <p className="text-xs text-gray-400 mt-1">{proxyStats.active} active • {proxyStats.expiring_soon} expiring</p>
             </div>
-            {folders.length > 0 ? (
-              <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
-                {folders.slice(0, 10).map((folder, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-orange-50/50 transition-colors cursor-pointer group"
-                    onClick={() => onSelectFolder?.(folder.id)}
-                  >
-                    <div className="w-7 h-7 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
-                      <FolderOpen className="w-3.5 h-3.5 text-orange-600" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 truncate flex-1 group-hover:text-orange-700 transition-colors">
-                      {folder.name || `Folder ${index + 1}`}
-                    </p>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{folder.profilesCount || 0} profiles</span>
-                  </div>
-                ))}
+
+            {/* Team Info */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-blue-50 p-2.5 rounded-lg">
+                  <Users className="h-5 w-5 text-blue-600" />
+                </div>
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center px-5">
-                <FolderOpen className="h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-xs text-gray-400">No folders</p>
+              <p className="text-sm text-gray-500 mb-0.5">Team: {teamData?.name || '...'}</p>
+              <p className="text-3xl font-bold text-gray-900">{teamMembers.length}</p>
+              <p className="text-xs text-gray-400 mt-1">Member{teamMembers.length !== 1 ? 's' : ''} of team</p>
+            </div>
+          </div>
+        ) : (
+          // Admin/Seller: 4 cards
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Folders - Hero Card (Admin only) */}
+            {isAdmin && (
+              <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 text-white shadow-lg shadow-orange-200/50">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
+                <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
+                <div className="relative">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <span className="text-sm font-medium text-orange-100">Total Folders</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-bold leading-none">{folders.length}</span>
+                    <span className="text-orange-200 text-sm mb-0.5">folders</span>
+                  </div>
+                  <div className="mt-3 bg-white/20 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-white rounded-full h-1.5 transition-all duration-500"
+                      style={{ width: `${folders.length > 0 ? '100' : '0'}%` }}
+                    />
+                  </div>
+                  <p className="text-orange-100 text-xs mt-1.5">Organizing your profiles</p>
+                </div>
+              </div>
+            )}
+
+            {/* Total Profiles */}
+            <div
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
+              onClick={() => onViewChange?.('profiles')}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-orange-50 p-2.5 rounded-lg group-hover:bg-orange-100 transition-colors">
+                  <Globe className="h-5 w-5 text-orange-600" />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
+              </div>
+              <p className="text-sm text-gray-500 mb-0.5">Total Profiles</p>
+              <p className="text-3xl font-bold text-gray-900">{totalCount}</p>
+              <p className="text-xs text-gray-400 mt-1">Click to view all</p>
+            </div>
+
+            {/* Total Proxy */}
+            <div
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
+              onClick={() => onViewChange?.('proxy')}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-emerald-50 p-2.5 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
+              </div>
+              <p className="text-sm text-gray-500 mb-0.5">Total Proxy</p>
+              <p className="text-3xl font-bold text-gray-900">{proxyStats.total}</p>
+              <p className="text-xs text-gray-400 mt-1">{proxyStats.active} active • {proxyStats.expiring_soon} expiring</p>
+            </div>
+
+            {/* Folders (Seller) */}
+            {isSeller && (
+              <div
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group"
+                onClick={() => onViewChange?.('folders')}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="bg-orange-50 p-2.5 rounded-lg group-hover:bg-orange-100 transition-colors">
+                    <FolderOpen className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-orange-400 transition-colors" />
+                </div>
+                <p className="text-sm text-gray-500 mb-0.5">Folders</p>
+                <p className="text-3xl font-bold text-gray-900">{folders.length}</p>
+                <p className="text-xs text-gray-400 mt-1">Profile groups</p>
+              </div>
+            )}
+
+            {/* Total Users (Admin only) */}
+            {isAdmin && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="bg-orange-50 p-2.5 rounded-lg">
+                    <Users className="h-5 w-5 text-orange-500" />
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mb-0.5">Total Users</p>
+                <p className="text-3xl font-bold text-gray-900">{userCount}</p>
+                <p className="text-xs text-gray-400 mt-1">System accounts</p>
+              </div>
+            )}
+
+            {/* Teams (Seller only) */}
+            {isSeller && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="bg-blue-50 p-2.5 rounded-lg">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mb-0.5">Team</p>
+                <p className="text-3xl font-bold text-gray-900 truncate">{sellerTeamData?.name || '...'}</p>
+                <p className="text-xs text-gray-400 mt-1">{sellerLeaderName || 'Loading...'}</p>
               </div>
             )}
           </div>
+        )}
+
+        {/* Row 2: Different layouts for each role */}
+        {/* Seller: Expiring Soon (2/3) + Profiles Overview + Proxy Status stacked (1/3) */}
+        {!isAdmin && !isLeader ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+            {/* Expiring Soon - takes 2 columns */}
+            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+              <div
+                className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+                onClick={() => onViewChange?.('proxy')}
+              >
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Expiring Soon
+                </h2>
+                <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  View all <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              {expiringProxies.length > 0 ? (
+                <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                  {expiringProxies.map((proxy, idx) => {
+                    const proxyId = proxy.id || proxy.proxy_id;
+                    const ip = proxy.public_ip || proxy.publicIp || '';
+                    const expires = proxy.expires_formatted || proxy.expires_at || proxy.expires || '';
+                    return (
+                      <div key={proxyId || idx} className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-50/50 transition-colors">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 font-mono truncate">{ip || proxyId}</p>
+                          <p className="text-xs text-amber-600 font-medium">{formatExpiry(expires)}</p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openExtendModal(proxy); }}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors flex-shrink-0 ml-2"
+                        >
+                          <Clock className="w-3.5 h-3.5" /> Extend
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center px-5">
+                  <Shield className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-xs text-gray-400">No proxies expiring soon</p>
+                </div>
+              )}
+            </div>
+
+            {/* Right column: Profiles Overview + Proxy Status stacked */}
+            <div className="flex flex-col gap-4 min-h-0">
+              {/* Profiles Overview */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col">
+                <h2 className="text-sm font-semibold text-gray-900 mb-3">Profiles Overview</h2>
+                <div className="flex-1 flex items-center justify-center">
+                  <DonutChart running={runningCount} available={availableCount} total={totalCount} />
+                </div>
+                <div className="flex items-center justify-center gap-4 text-xs mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                    <span className="text-gray-600">Running ({runningCount})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
+                    <span className="text-gray-600">Available ({availableCount})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Proxy Status */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col flex-1">
+                <h2 className="text-sm font-semibold text-gray-900 mb-3">Proxy Status</h2>
+                <div className="flex-1 flex items-center justify-center">
+                  <ProxyStatusChart
+                    active={proxyStats.active}
+                    expiring={proxyStats.expiring_soon}
+                    inactive={proxyStats.inactive}
+                  />
+                </div>
+                <div className="space-y-2.5 mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-gray-600">Active</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900">{proxyStats.active}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <span className="text-xs text-gray-600">Expiring Soon</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900">{proxyStats.expiring_soon}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+                      <span className="text-xs text-gray-600">Inactive</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900">{proxyStats.inactive}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Admin/Leader: Member Profiles (Leader) OR Folders (Admin) + Profiles Overview */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+          {isLeader ? (
+            // Leader: Member Profiles - takes 2 columns
+            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+                <h2 className="text-sm font-semibold text-gray-900">Member Profiles</h2>
+                <span className="text-xs text-gray-400">{memberProfiles.length} profiles</span>
+              </div>
+              {memberProfiles.length > 0 ? (
+                <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                  {memberProfiles.slice(0, 15).map((profile, index) => {
+                    const profileId = profile.profile_id || profile.id;
+                    const isRunning = isProfileRunning(profileId);
+                    const isActive = profile.status === 'active' || !profile.status;
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                        onClick={() => onViewChange?.('profiles')}
+                      >
+                        <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isRunning ? 'bg-green-100 group-hover:bg-green-200' : 'bg-blue-100 group-hover:bg-blue-200'
+                        }`}>
+                          <Globe className={`w-3.5 h-3.5 ${isRunning ? 'text-green-600' : 'text-blue-600'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                            {profile.name || profileId}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">{profile.member_name} • {profile.folder_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {isRunning ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <Play className="w-3 h-3 fill-current" /> Running
+                            </span>
+                          ) : isActive ? (
+                            <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Active
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Inactive
+                            </span>
+                          )}
+                          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center px-5">
+                  <Users className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-xs text-gray-400">No member profiles</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Admin/Seller: Folders - takes 2 columns
+            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
+              <div
+                className="flex items-center justify-between px-5 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors group flex-shrink-0"
+                onClick={() => onViewChange?.('folders')}
+              >
+                <h2 className="text-sm font-semibold text-gray-900">Folders</h2>
+                <div className="flex items-center gap-1 text-xs text-orange-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  View all <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              {folders.length > 0 ? (
+                <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                  {folders.slice(0, 10).map((folder, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-orange-50/50 transition-colors cursor-pointer group"
+                      onClick={() => onSelectFolder?.(folder.id)}
+                    >
+                      <div className="w-7 h-7 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
+                        <FolderOpen className="w-3.5 h-3.5 text-orange-600" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 truncate flex-1 group-hover:text-orange-700 transition-colors">
+                        {folder.name || `Folder ${index + 1}`}
+                      </p>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{folder.profilesCount || 0} profiles</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center px-5">
+                  <FolderOpen className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-xs text-gray-400">No folders</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Profiles Overview - takes 1 column */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col">
@@ -656,8 +967,10 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
             </div>
           </div>
         </div>
+        )}
 
-        {/* Row 3: Expiring Soon (2/3) + Proxy Status (1/3) */}
+        {/* Row 3: Expiring Soon (2/3) + Proxy Status (1/3) - Only for Admin/Leader */}
+        {(isAdmin || isLeader) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
           {/* Expiring Soon - takes 2 columns */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-h-0">
@@ -743,6 +1056,7 @@ export function Dashboard({ goLoginStats, onRefresh, currentUser, onViewChange, 
             </div>
           </div>
         </div>
+        )}
 
       </div>
 
