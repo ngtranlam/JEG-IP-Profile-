@@ -230,7 +230,6 @@ export class GoLoginSDKService {
           
           extraParams = [
             ...commonFlags,
-            '--force-device-scale-factor=1',
             `--window-size=${windowWidth},${windowHeight}`,
             `--window-position=${windowX},${windowY}`,
             '--min-window-size=1280,900'
