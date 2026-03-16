@@ -1,7 +1,7 @@
 {
   "name": "chrome-profile-tool",
-  "version": "1.0.0",
-  "description": "Chrome Profile Management Tool for Etsy & TikTok Shop",
+  "version": "1.1.0",
+  "description": "JEG Anditect Browser - Anti-Detect Browser for Multi-Account Management",
   "main": "dist/main/main/main.js",
   "homepage": "./",
   "scripts": {
@@ -87,7 +87,7 @@
   },
   "build": {
     "appId": "com.jeg.chrome-profile-tool",
-    "productName": "JEG Profile Manager",
+    "productName": "JEG Anditect Browser",
     "afterPack": "./scripts/afterPack.js",
     "directories": {
       "output": "release",
@@ -162,7 +162,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "JEG Profile Manager",
+      "shortcutName": "JEG Anditect Browser",
       "include": "installer.nsh"
     },
     "dmg": {
@@ -178,7 +178,7 @@
           "path": "/Applications"
         }
       ],
-      "title": "JEG Profile Manager ${version}"
+      "title": "JEG Anditect Browser ${version}"
     },
     "linux": {
       "target": "AppImage",
