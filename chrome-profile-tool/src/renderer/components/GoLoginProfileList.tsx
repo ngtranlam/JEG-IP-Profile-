@@ -28,6 +28,7 @@ interface GoLoginProfileListProps {
 
 export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, initialFolderId }: GoLoginProfileListProps) {
   const isSeller = currentUser?.roles === '3';
+  const isLeader = currentUser?.roles === '2';
   const [profiles, setProfiles] = useState<GoLoginProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -374,6 +375,17 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
       if (isSeller) {
         setHasAssignedFolders((folderList || []).length > 0);
       }
+      
+      // Leader: auto-select their own folder as default for new profiles
+      if (isLeader && folderList && folderList.length > 0) {
+        const leaderOwnFolder = folderList.find((f: any) => String(f.seller_id) === String(currentUser?.id));
+        if (leaderOwnFolder) {
+          setNewProfileFolder(leaderOwnFolder.folder_id);
+        } else {
+          // Fallback: use first folder
+          setNewProfileFolder(folderList[0].folder_id);
+        }
+      }
     } catch (error) {
       console.error('Failed to load folders from database:', error);
       if (isSeller) {
@@ -601,6 +613,23 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
         // Seller: automatically use their first assigned folder
         if (folders.length > 0) {
           folderName = folders[0].name;
+        }
+      } else if (isLeader) {
+        // Leader: use selected folder (defaults to leader's own folder)
+        if (newProfileFolder) {
+          const selected = folders.find(f => f.folder_id === newProfileFolder);
+          if (selected) {
+            folderName = selected.name;
+          }
+        }
+        // Fallback: if no folder selected, use leader's own folder
+        if (!folderName && folders.length > 0) {
+          const leaderOwnFolder = folders.find((f: any) => String(f.seller_id) === String(currentUser?.id));
+          if (leaderOwnFolder) {
+            folderName = leaderOwnFolder.name;
+          } else {
+            folderName = folders[0].name;
+          }
         }
       } else {
         // Admin: use selected folder
@@ -1359,10 +1388,10 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     onChange={(e) => setNewProfileFolder(e.target.value)}
                     className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">No folder</option>
+                    {!isLeader && <option value="">No folder</option>}
                     {folders.map((folder) => (
                       <option key={folder.folder_id} value={folder.folder_id}>
-                        {folder.name}
+                        {folder.name}{String(folder.seller_id) === String(currentUser?.id) ? ' (My folder)' : ''}
                       </option>
                     ))}
                   </select>
