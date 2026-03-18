@@ -240,6 +240,25 @@ export class GoLoginSDKService {
         }
       }
       
+      // Load local extensions for this profile
+      try {
+        const { app } = require('electron');
+        const fs = require('fs');
+        const extensionsMetaPath = require('path').join(app.getPath('userData'), 'extensions', profileId, 'extensions.json');
+        if (fs.existsSync(extensionsMetaPath)) {
+          const extensions = JSON.parse(fs.readFileSync(extensionsMetaPath, 'utf-8'));
+          const validPaths = extensions
+            .map((ext: any) => ext.path)
+            .filter((p: string) => fs.existsSync(p));
+          if (validPaths.length > 0) {
+            extraParams.push(`--load-extension=${validPaths.join(',')}`);
+            console.log(`[Extension] Loading ${validPaths.length} local extension(s) for profile ${profileId}`);
+          }
+        }
+      } catch (extErr) {
+        console.warn('[Extension] Failed to load local extensions:', extErr);
+      }
+
       const gologinInstance = new GoLogin({
         token: this.apiToken,
         profile_id: profileId,

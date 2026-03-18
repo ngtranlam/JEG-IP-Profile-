@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
@@ -40,6 +40,21 @@ if (!process.env.GOLOGIN_API_TOKEN) {
   console.error('Please ensure .env file exists in one of the checked paths');
 } else {
   console.log('✓ GOLOGIN_API_TOKEN loaded successfully');
+}
+
+// Helper: recursively copy a directory
+function copyDirSync(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 class ChromeProfileTool {
@@ -1036,6 +1051,144 @@ class ChromeProfileTool {
 
     ipcMain.handle('gologin-sdk:stop-all-profiles', async () => {
       return await this.apiService.gologinSDKStopAllProfiles();
+    });
+
+    // Extension management IPC handlers
+    ipcMain.handle('extension:select-folder', async () => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return null;
+      
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openDirectory'],
+        title: 'Select Extension Folder',
+      });
+      
+      if (result.canceled || result.filePaths.length === 0) return null;
+      
+      const folderPath = result.filePaths[0];
+      const manifestPath = path.join(folderPath, 'manifest.json');
+      
+      if (!fs.existsSync(manifestPath)) {
+        return { error: 'No manifest.json found in selected folder. Please select a valid Chrome extension folder.' };
+      }
+      
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        const extName = manifest.name || path.basename(folderPath);
+        const extVersion = manifest.version || '0.0.0';
+        
+        // Look for icon
+        let iconPath = '';
+        const icons = manifest.icons || {};
+        const iconSizes = ['128', '64', '48', '32', '16'];
+        for (const size of iconSizes) {
+          if (icons[size]) {
+            const fullIconPath = path.join(folderPath, icons[size]);
+            if (fs.existsSync(fullIconPath)) {
+              iconPath = fullIconPath;
+              break;
+            }
+          }
+        }
+        
+        return {
+          name: extName,
+          version: extVersion,
+          folderPath,
+          iconPath,
+          manifestVersion: manifest.manifest_version || 2,
+          description: manifest.description || '',
+        };
+      } catch (err: any) {
+        return { error: `Failed to parse manifest.json: ${err.message}` };
+      }
+    });
+
+    ipcMain.handle('extension:add-to-profile', async (_, profileId: string, extensionData: { name: string; version: string; folderPath: string; iconPath: string }) => {
+      try {
+        const extensionsDir = path.join(app.getPath('userData'), 'extensions', profileId);
+        if (!fs.existsSync(extensionsDir)) {
+          fs.mkdirSync(extensionsDir, { recursive: true });
+        }
+        
+        // Generate unique ID for this extension
+        const extId = `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const destDir = path.join(extensionsDir, extId);
+        
+        // Copy extension folder to managed location
+        copyDirSync(extensionData.folderPath, destDir);
+        
+        // Read icon as base64 if available
+        let iconBase64 = '';
+        if (extensionData.iconPath && fs.existsSync(extensionData.iconPath)) {
+          const iconBuffer = fs.readFileSync(extensionData.iconPath);
+          const ext = path.extname(extensionData.iconPath).toLowerCase();
+          const mimeType = ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'image/jpeg';
+          iconBase64 = `data:${mimeType};base64,${iconBuffer.toString('base64')}`;
+        }
+        
+        // Save metadata
+        const metadataPath = path.join(extensionsDir, 'extensions.json');
+        let metadata: any[] = [];
+        if (fs.existsSync(metadataPath)) {
+          metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+        }
+        
+        metadata.push({
+          id: extId,
+          name: extensionData.name,
+          version: extensionData.version,
+          path: destDir,
+          icon: iconBase64,
+          addedAt: new Date().toISOString(),
+        });
+        
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+        
+        return { success: true, extension: metadata[metadata.length - 1] };
+      } catch (err: any) {
+        console.error('[Extension] Failed to add:', err);
+        return { success: false, error: err.message };
+      }
+    });
+
+    ipcMain.handle('extension:remove-from-profile', async (_, profileId: string, extensionId: string) => {
+      try {
+        const extensionsDir = path.join(app.getPath('userData'), 'extensions', profileId);
+        const metadataPath = path.join(extensionsDir, 'extensions.json');
+        
+        if (!fs.existsSync(metadataPath)) {
+          return { success: false, error: 'No extensions found' };
+        }
+        
+        let metadata: any[] = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+        const ext = metadata.find(e => e.id === extensionId);
+        
+        if (ext && ext.path && fs.existsSync(ext.path)) {
+          fs.rmSync(ext.path, { recursive: true, force: true });
+        }
+        
+        metadata = metadata.filter(e => e.id !== extensionId);
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+        
+        return { success: true };
+      } catch (err: any) {
+        console.error('[Extension] Failed to remove:', err);
+        return { success: false, error: err.message };
+      }
+    });
+
+    ipcMain.handle('extension:get-profile-extensions', async (_, profileId: string) => {
+      try {
+        const metadataPath = path.join(app.getPath('userData'), 'extensions', profileId, 'extensions.json');
+        if (!fs.existsSync(metadataPath)) {
+          return [];
+        }
+        return JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+      } catch (err: any) {
+        console.error('[Extension] Failed to get extensions:', err);
+        return [];
+      }
     });
   }
 

@@ -131,6 +131,29 @@ class GoLoginAPI {
     }
 
     public function updateProfile($profileId, $profileData) {
+        // GoLogin API requires full profile object for PUT
+        // Fetch current profile, merge changes, then PUT
+        $currentProfile = $this->makeRequest('/browser/' . $profileId);
+        if (is_array($currentProfile)) {
+            // Merge only the fields that are being updated
+            foreach ($profileData as $key => $value) {
+                $currentProfile[$key] = $value;
+            }
+            // Remove read-only fields that GoLogin rejects on update
+            unset($currentProfile['id']);
+            unset($currentProfile['createdAt']);
+            unset($currentProfile['updatedAt']);
+            unset($currentProfile['lastActivity']);
+            unset($currentProfile['owner']);
+            unset($currentProfile['shared']);
+            unset($currentProfile['canBeRunning']);
+            unset($currentProfile['chromeExtensions']);
+            unset($currentProfile['userChromeExtensions']);
+            unset($currentProfile['folders']);
+            unset($currentProfile['tags']);
+            return $this->makeRequest('/browser/' . $profileId, 'PUT', $currentProfile);
+        }
+        // Fallback: try direct PUT
         return $this->makeRequest('/browser/' . $profileId, 'PUT', $profileData);
     }
 

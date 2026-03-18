@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Play, Trash2, Settings, Folder, Tag, Globe, X, Upload, FolderOpen, Check, Edit } from 'lucide-react';
+import { EditProfileModal } from './EditProfileModal';
 
 interface GoLoginProfile {
   id: string;
@@ -85,6 +86,14 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   const [proxyUsername, setProxyUsername] = useState('');
   const [proxyPassword, setProxyPassword] = useState('');
 
+  // Edit Profile Modal state
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editProfileData, setEditProfileData] = useState<GoLoginProfile | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; profile: GoLoginProfile } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
   // Fetch running profiles from backend on mount (restores state after tab switch/reload)
   useEffect(() => {
     const fetchRunningProfiles = async () => {
@@ -140,6 +149,19 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     const interval = setInterval(fetchRunningProfiles, 15000);
     return () => clearInterval(interval);
   }, [currentUser]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [contextMenu]);
 
   // Listen for browser closed events
   useEffect(() => {
@@ -738,6 +760,22 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     });
   };
 
+  const handleOpenEditProfile = (profile: GoLoginProfile) => {
+    setEditProfileData(profile);
+    setShowEditProfile(true);
+    setContextMenu(null);
+  };
+
+  const handleSaveProfile = async (profileId: string, data: any) => {
+    try {
+      await window.electronAPI.gologinUpdateProfile(profileId, data);
+      await loadProfiles();
+    } catch (err: any) {
+      console.error('Failed to save profile:', err);
+      throw err;
+    }
+  };
+
   const handleOpenEditProxy = (profile: GoLoginProfile) => {
     setSelectedProfileForProxy(profile.id);
     setProxyMode(profile.proxy?.mode || 'http');
@@ -1111,7 +1149,14 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
             <tbody className="divide-y divide-gray-100">
               {profiles.map((profile, index) => {
                 return (
-                <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={profile.id}
+                  className="hover:bg-gray-50 transition-colors"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, profile });
+                  }}
+                >
                   {/* Row Number */}
                   <td className="px-2 py-3">
                     <span className="text-xs text-gray-500">{index + 1}</span>
@@ -2119,6 +2164,70 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
             </div>
           </div>
         </div>
+      )}
+
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[70] min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => handleOpenEditProfile(contextMenu.profile)}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </button>
+          <button
+            onClick={() => {
+              handleOpenEditProxy(contextMenu.profile);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Globe className="w-4 h-4" />
+            Edit Proxy
+          </button>
+          <button
+            onClick={() => {
+              handleOpenFolderManager(contextMenu.profile.id);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <FolderOpen className="w-4 h-4" />
+            Manage Folders
+          </button>
+          <hr className="my-1" />
+          <button
+            onClick={() => {
+              handleDeleteProfile(contextMenu.profile.id);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && editProfileData && (
+        <EditProfileModal
+          profileId={editProfileData.id}
+          profileName={editProfileData.name}
+          profileProxy={editProfileData.proxy}
+          onClose={async () => {
+            setShowEditProfile(false);
+            setEditProfileData(null);
+            await syncData();
+            await loadProfiles();
+          }}
+          onSave={handleSaveProfile}
+        />
       )}
     </div>
   );

@@ -128,7 +128,7 @@ try {
                             echo json_encode(['error' => 'Invalid JSON input']);
                             exit();
                         }
-                        $result = $gologinAPI->setProfileProxy($profileId, $input);
+                        $result = $gologinAPI->setProxy($profileId, $input);
                         echo json_encode(['success' => true, 'data' => $result]);
                         break;
                         

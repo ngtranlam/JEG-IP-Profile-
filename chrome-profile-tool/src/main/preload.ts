@@ -98,6 +98,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gologinTestConnection: () => 
     ipcRenderer.invoke('gologin:test-connection'),
 
+  // Extension management
+  extensionSelectFolder: () =>
+    ipcRenderer.invoke('extension:select-folder'),
+  
+  extensionAddToProfile: (profileId: string, extensionData: any) =>
+    ipcRenderer.invoke('extension:add-to-profile', profileId, extensionData),
+  
+  extensionRemoveFromProfile: (profileId: string, extensionId: string) =>
+    ipcRenderer.invoke('extension:remove-from-profile', profileId, extensionId),
+  
+  extensionGetProfileExtensions: (profileId: string) =>
+    ipcRenderer.invoke('extension:get-profile-extensions', profileId),
+
   // Local Data API methods (from database)
   localDataGetFolders: () => 
     ipcRenderer.invoke('local-data:get-folders'),
@@ -406,6 +419,12 @@ declare global {
       gologinListTags: () => Promise<any[]>;
       gologinTestConnection: () => Promise<boolean>;
       gologinGetProxyLocations: () => Promise<any[]>;
+      
+      // Extension management
+      extensionSelectFolder: () => Promise<any>;
+      extensionAddToProfile: (profileId: string, extensionData: any) => Promise<{ success: boolean; extension?: any; error?: string }>;
+      extensionRemoveFromProfile: (profileId: string, extensionId: string) => Promise<{ success: boolean; error?: string }>;
+      extensionGetProfileExtensions: (profileId: string) => Promise<any[]>;
       
       // Local Data API methods
       localDataGetFolders: () => Promise<any[]>;
