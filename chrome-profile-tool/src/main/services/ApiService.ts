@@ -308,6 +308,24 @@ export class ApiService {
     return response.data;
   }
 
+  // Browser version APIs
+  async gologinGetBrowserVersions(): Promise<any> {
+    const response = await this.makeRequest('/gologin/browser-versions');
+    return response.data;
+  }
+
+  async gologinGetBrowserVersionDetail(majorVersion: string): Promise<any> {
+    const response = await this.makeRequest(`/gologin/browser-version-detail?major=${majorVersion}`);
+    return response.data;
+  }
+
+  async gologinGetFingerprint(os: string, resolution?: string): Promise<any> {
+    let endpoint = `/gologin/fingerprint?os=${os}`;
+    if (resolution) endpoint += `&resolution=${resolution}`;
+    const response = await this.makeRequest(endpoint);
+    return response.data;
+  }
+
   // Local Data API methods (from database)
   async getLocalFolders(token: string): Promise<any[]> {
     const response = await this.makeRequest('/local_data/folders', {

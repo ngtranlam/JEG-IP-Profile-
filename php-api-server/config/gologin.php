@@ -247,6 +247,21 @@ class GoLoginAPI {
         ]);
     }
 
+    public function getSupportedOrbitaVersions() {
+        return $this->makeRequest('/gologin-global-settings/supported_orbita_versions');
+    }
+
+    public function getOrbitaVersionByMajor($majorVersion) {
+        return $this->makeRequest('/gologin-global-settings/orbita_version_by_major?orbita_major_version=' . urlencode($majorVersion));
+    }
+
+    public function getNewFingerprint($os = 'win', $resolution = null, $isM1 = false) {
+        $params = ['os' => $os];
+        if ($resolution) $params['resolution'] = $resolution;
+        if ($isM1) $params['isM1'] = 'true';
+        return $this->makeRequest('/browser/fingerprint?' . http_build_query($params));
+    }
+
     public function getProfileCookies($profileId) {
         return $this->makeRequest('/browser/' . $profileId . '/cookies', 'GET');
     }

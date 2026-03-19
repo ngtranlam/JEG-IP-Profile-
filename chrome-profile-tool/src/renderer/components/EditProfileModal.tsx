@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Clipboard, Check } from 'lucide-react';
+import { X, Plus, Trash2, Clipboard, Check, ChevronDown, Globe, Monitor } from 'lucide-react';
 
 interface ExtensionInfo {
   id: string;
@@ -61,6 +61,16 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
     description: string;
   } | null>(null);
 
+  // Browser version state
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+  const [currentUserAgent, setCurrentUserAgent] = useState('');
+  const [currentChromeVersion, setCurrentChromeVersion] = useState('');
+  const [selectedMajorVersion, setSelectedMajorVersion] = useState('');
+  const [profileOs, setProfileOs] = useState('win');
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [versionDirty, setVersionDirty] = useState(false);
+
   const tabs = [
     { id: 'overview', name: 'Overview' },
     { id: 'proxy', name: 'Proxy' },
@@ -71,9 +81,17 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
     { id: 'advanced', name: 'Advanced' },
   ];
 
-  // Load extensions on mount
+  // Extract Chrome major version from userAgent string
+  const extractChromeVersion = (ua: string): string => {
+    const match = ua.match(/Chrome\/(\d+)/);
+    return match ? match[1] : '';
+  };
+
+  // Load full profile data and browser versions on mount
   useEffect(() => {
     loadExtensions();
+    loadFullProfile();
+    loadBrowserVersions();
   }, [profileId]);
 
   const loadExtensions = async () => {
@@ -85,6 +103,43 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
       console.error('Failed to load extensions:', err);
     } finally {
       setLoadingExtensions(false);
+    }
+  };
+
+  const loadFullProfile = async () => {
+    setLoadingProfile(true);
+    try {
+      const profile = await window.electronAPI.gologinGetFullProfile(profileId);
+      if (profile) {
+        const ua = profile.navigator?.userAgent || '';
+        setCurrentUserAgent(ua);
+        const majorV = extractChromeVersion(ua);
+        setCurrentChromeVersion(majorV);
+        setSelectedMajorVersion(majorV);
+        setProfileOs(profile.os || 'win');
+      }
+    } catch (err) {
+      console.error('Failed to load full profile:', err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const loadBrowserVersions = async () => {
+    setLoadingVersions(true);
+    try {
+      const data = await window.electronAPI.gologinGetBrowserVersions();
+      // API returns { supportedOrbitaVersions: ["105", "106", ...] }
+      const versions = data?.supportedOrbitaVersions || data;
+      if (Array.isArray(versions)) {
+        // Sort versions descending (newest first)
+        const sorted = [...versions].sort((a: string, b: string) => parseInt(b) - parseInt(a));
+        setAvailableVersions(sorted);
+      }
+    } catch (err) {
+      console.error('Failed to load browser versions:', err);
+    } finally {
+      setLoadingVersions(false);
     }
   };
 
@@ -271,6 +326,29 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
           }
         } catch (err: any) {
           errors.push('Proxy: ' + err.message);
+        }
+      }
+      
+      // 3. Update browser version if user changed it
+      if (versionDirty && selectedMajorVersion && selectedMajorVersion !== currentChromeVersion) {
+        try {
+          // Get a new fingerprint for the selected OS to get a matching userAgent
+          const fingerprint = await window.electronAPI.gologinGetFingerprint(profileOs);
+          if (fingerprint?.navigator?.userAgent) {
+            // Replace the Chrome version in the new fingerprint's userAgent with the selected version
+            const newUa = fingerprint.navigator.userAgent.replace(
+              /Chrome\/\d+/,
+              `Chrome/${selectedMajorVersion}`
+            );
+            await onSave(profileId, {
+              navigator: {
+                ...fingerprint.navigator,
+                userAgent: newUa,
+              },
+            });
+          }
+        } catch (err: any) {
+          errors.push('Browser version: ' + err.message);
         }
       }
       
@@ -569,8 +647,73 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              Overview settings will be available soon.
+            <div>
+              {loadingProfile ? (
+                <div className="text-center py-8 text-gray-500 text-sm">Loading profile data...</div>
+              ) : (
+                <>
+                  {/* Operating System */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Operating System</label>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border rounded-lg w-80">
+                      <Monitor className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">
+                        {profileOs === 'win' ? 'Windows' : profileOs === 'mac' ? 'macOS' : profileOs === 'lin' ? 'Linux' : profileOs === 'android' ? 'Android' : profileOs}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Browser Version */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Chrome Browser Version</label>
+                    {currentUserAgent && (
+                      <p className="text-xs text-gray-400 mb-2 truncate max-w-lg" title={currentUserAgent}>
+                        Current UA: {currentUserAgent}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <select
+                          value={selectedMajorVersion}
+                          onChange={(e) => {
+                            setSelectedMajorVersion(e.target.value);
+                            setVersionDirty(true);
+                          }}
+                          disabled={loadingVersions || availableVersions.length === 0}
+                          className="w-80 px-3 py-2 border rounded-lg text-sm appearance-none pr-8 bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
+                        >
+                          {!selectedMajorVersion && (
+                            <option value="">Select Chrome version</option>
+                          )}
+                          {availableVersions.map((v) => (
+                            <option key={v} value={v}>
+                              Chrome {v}
+                              {v === currentChromeVersion ? ' (current)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                      {loadingVersions && (
+                        <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                    {selectedMajorVersion && selectedMajorVersion !== currentChromeVersion && (
+                      <p className="text-xs text-orange-600 mt-2">
+                        Version will be updated from Chrome {currentChromeVersion || '?'} → Chrome {selectedMajorVersion} on save.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Profile Info */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Profile ID</label>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border">{profileId}</code>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

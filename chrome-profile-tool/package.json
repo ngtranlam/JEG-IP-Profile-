@@ -1,6 +1,6 @@
 {
   "name": "chrome-profile-tool",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "JEG Anditect Browser - Anti-Detect Browser for Multi-Account Management",
   "main": "dist/main/main/main.js",
   "homepage": "./",

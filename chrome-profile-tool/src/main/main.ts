@@ -241,6 +241,18 @@ class ChromeProfileTool {
       return await this.apiService.gologinTestConnection();
     });
 
+    ipcMain.handle('gologin:get-browser-versions', async () => {
+      return await this.apiService.gologinGetBrowserVersions();
+    });
+
+    ipcMain.handle('gologin:get-browser-version-detail', async (_, majorVersion) => {
+      return await this.apiService.gologinGetBrowserVersionDetail(majorVersion);
+    });
+
+    ipcMain.handle('gologin:get-fingerprint', async (_, os, resolution) => {
+      return await this.apiService.gologinGetFingerprint(os, resolution);
+    });
+
     ipcMain.handle('gologin:get-cookies', async (_, profileId) => {
       return await this.apiService.gologinGetCookies(profileId);
     });

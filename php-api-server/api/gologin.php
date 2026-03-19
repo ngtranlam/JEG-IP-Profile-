@@ -26,7 +26,7 @@ try {
     
     if (count($pathParts) >= 3 && $pathParts[2] !== '') {
         // Check if pathParts[2] is a special action (folders, tags, proxy-locations)
-        if (in_array($pathParts[2], ['folders', 'tags', 'proxy-locations', 'test-connection'])) {
+        if (in_array($pathParts[2], ['folders', 'tags', 'proxy-locations', 'test-connection', 'browser-versions', 'browser-version-detail', 'fingerprint'])) {
             $action = $pathParts[2];
         } else {
             // It's a profile ID
@@ -76,6 +76,42 @@ try {
                 try {
                     $locations = $gologinAPI->getProxyLocations();
                     echo json_encode(['success' => true, 'data' => $locations]);
+                } catch (Exception $e) {
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+            } elseif ($action === 'browser-versions') {
+                // Get supported browser versions
+                try {
+                    $versions = $gologinAPI->getSupportedOrbitaVersions();
+                    echo json_encode(['success' => true, 'data' => $versions]);
+                } catch (Exception $e) {
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+            } elseif ($action === 'browser-version-detail') {
+                // Get minor versions for a major version
+                $majorVersion = $_GET['major'] ?? null;
+                if (!$majorVersion) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Major version is required']);
+                    exit();
+                }
+                try {
+                    $detail = $gologinAPI->getOrbitaVersionByMajor($majorVersion);
+                    echo json_encode(['success' => true, 'data' => $detail]);
+                } catch (Exception $e) {
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+            } elseif ($action === 'fingerprint') {
+                // Get new fingerprint
+                $os = $_GET['os'] ?? 'win';
+                $resolution = $_GET['resolution'] ?? null;
+                $isM1 = isset($_GET['isM1']);
+                try {
+                    $fingerprint = $gologinAPI->getNewFingerprint($os, $resolution, $isM1);
+                    echo json_encode(['success' => true, 'data' => $fingerprint]);
                 } catch (Exception $e) {
                     http_response_code(500);
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

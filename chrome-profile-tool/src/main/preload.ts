@@ -98,6 +98,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gologinTestConnection: () => 
     ipcRenderer.invoke('gologin:test-connection'),
 
+  gologinGetBrowserVersions: () =>
+    ipcRenderer.invoke('gologin:get-browser-versions'),
+
+  gologinGetBrowserVersionDetail: (majorVersion: string) =>
+    ipcRenderer.invoke('gologin:get-browser-version-detail', majorVersion),
+
+  gologinGetFingerprint: (os: string, resolution?: string) =>
+    ipcRenderer.invoke('gologin:get-fingerprint', os, resolution),
+
+  gologinGetFullProfile: (profileId: string) =>
+    ipcRenderer.invoke('gologin:get-profile', profileId),  // Uses existing handler
+
   // Extension management
   extensionSelectFolder: () =>
     ipcRenderer.invoke('extension:select-folder'),
@@ -419,6 +431,10 @@ declare global {
       gologinListTags: () => Promise<any[]>;
       gologinTestConnection: () => Promise<boolean>;
       gologinGetProxyLocations: () => Promise<any[]>;
+      gologinGetBrowserVersions: () => Promise<any>;
+      gologinGetBrowserVersionDetail: (majorVersion: string) => Promise<any>;
+      gologinGetFingerprint: (os: string, resolution?: string) => Promise<any>;
+      gologinGetFullProfile: (profileId: string) => Promise<any>;
       
       // Extension management
       extensionSelectFolder: () => Promise<any>;

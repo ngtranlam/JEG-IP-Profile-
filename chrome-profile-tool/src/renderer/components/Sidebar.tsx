@@ -223,7 +223,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
         )}
         
         <div className="text-xs text-muted-foreground">
-          Version 1.2.0
+          Version 1.2.1
         </div>
       </div>
 
