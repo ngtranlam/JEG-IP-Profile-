@@ -33,9 +33,12 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   const [profiles, setProfiles] = useState<GoLoginProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const searchTermRef = useRef('');
   const [currentPage, setCurrentPage] = useState(1);
+  const currentPageRef = useRef(1);
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [selectedFolder, setSelectedFolder] = useState<string>(initialFolderId || '');
+  const selectedFolderRef = useRef<string>(initialFolderId || '');
   const [folders, setFolders] = useState<any[]>([]);
   const [hasAssignedFolders, setHasAssignedFolders] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -309,6 +312,19 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     testConnection();
   }, []);
 
+  // Keep refs in sync with state for stable access from callbacks (e.g. onBrowserClosed)
+  useEffect(() => {
+    selectedFolderRef.current = selectedFolder;
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    searchTermRef.current = searchTerm;
+  }, [searchTerm]);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
   // Reload profiles when page, search, or folder changes
   useEffect(() => {
     loadProfiles();
@@ -338,18 +354,21 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   const loadProfiles = async () => {
     try {
       setLoading(true);
-      // Use local_data API with role-based filtering
+      // Always use refs for the latest values (avoids stale closure issues from onBrowserClosed etc.)
+      const page = currentPageRef.current;
+      const search = searchTermRef.current;
+      const folder = selectedFolderRef.current;
       console.log('Loading profiles with filters:', { 
-        page: currentPage, 
-        search: searchTerm, 
-        folder: selectedFolder 
+        page, 
+        search, 
+        folder 
       });
       
       const result = await window.electronAPI.localDataGetProfiles(
-        currentPage,
+        page,
         50, // limit
-        searchTerm || undefined,
-        selectedFolder || undefined
+        search || undefined,
+        folder || undefined
       );
       
       // Transform and normalize profile data from database
@@ -1122,13 +1141,13 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
             )}
           </div>
         ) : (
-          <div className="min-w-full">
+          <div className="min-w-full overflow-x-auto">
             {/* Table Header */}
-            <table className="w-full table-fixed">
+            <table className="w-full table-fixed" style={{ minWidth: '900px' }}>
             <thead className="bg-gray-50 border-b sticky top-0 z-10">
               <tr className="text-xs font-medium text-gray-700 uppercase tracking-wider">
                 <th className="w-[30px] px-2 py-3 text-left">#</th>
-                <th className="w-[20%] px-2 py-3 text-left">
+                <th className="w-[15%] px-2 py-3 text-left">
                   <div className="flex items-center gap-2">
                     <span>Name</span>
                     <div className="flex flex-col">
@@ -1138,10 +1157,10 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     <Plus className="w-3 h-3 text-gray-400" />
                   </div>
                 </th>
-                <th className="w-[12%] px-2 py-3 text-left">State</th>
-                <th className="w-[18%] px-2 py-3 text-left">Seller</th>
-                <th className="w-[22%] px-2 py-3 text-left">Notes</th>
-                <th className="w-[18%] px-2 py-3 text-left">Location</th>
+                <th className="w-[20%] px-2 py-3 text-left">State</th>
+                <th className="w-[15%] px-2 py-3 text-left">Seller</th>
+                <th className="w-[18%] px-2 py-3 text-left">Notes</th>
+                <th className="w-[20%] px-2 py-3 text-left">Location</th>
                 <th className="w-[70px] px-2 py-3"></th>
               </tr>
             </thead>
@@ -1162,15 +1181,15 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                     <span className="text-xs text-gray-500">{index + 1}</span>
                   </td>
                   {/* Name */}
-                  <td className="px-2 py-3">
+                  <td className="px-2 py-3 overflow-hidden">
                     <span className="text-sm font-medium text-gray-900 truncate block">
                       {profile.name}
                     </span>
                   </td>
 
                   {/* State */}
-                  <td className="px-2 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="px-2 py-3 overflow-hidden">
+                    <div className="flex items-center gap-2 flex-nowrap">
                     {(() => {
                       const isRunning = runningProfiles.has(profile.id);
                       const isChecking = checkingProfiles.has(profile.id);
@@ -1229,14 +1248,14 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                   </td>
 
                   {/* Seller */}
-                  <td className="px-2 py-3">
+                  <td className="px-2 py-3 overflow-hidden">
                     <span className="text-xs text-gray-600 truncate block" title={(profile as any).folder_names || '-'}>
                       {(profile as any).folder_names || '-'}
                     </span>
                   </td>
 
                   {/* Notes */}
-                  <td className="px-2 py-3">
+                  <td className="px-2 py-3 overflow-hidden">
                     <div className="min-w-0">
                     {editingNoteId === profile.id ? (
                       <input
@@ -1261,8 +1280,8 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                   </td>
 
                   {/* Location */}
-                  <td className="px-2 py-3">
-                    <div className="flex items-center gap-2 overflow-hidden">
+                  <td className="px-2 py-3 overflow-hidden">
+                    <div className="flex items-center gap-2 overflow-hidden flex-nowrap">
                     {(() => {
                       // Check proxy mode and get location
                       if (!profile.proxy || profile.proxy.mode === 'none') {
