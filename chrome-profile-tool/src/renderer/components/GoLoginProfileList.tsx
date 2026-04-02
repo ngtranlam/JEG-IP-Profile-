@@ -894,12 +894,12 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     URL.revokeObjectURL(url);
   };
 
-  const handleLaunchProfile = async (profileId: string) => {
+  const handleLaunchProfile = async (profileId: string, profileName?: string) => {
     try {
       // Set checking state
       setCheckingProfiles(prev => new Set(prev).add(profileId));
       
-      await window.electronAPI.gologinLaunchProfile(profileId, { headless: false });
+      await window.electronAPI.gologinLaunchProfile(profileId, { headless: false, profileName });
       
       // Remove from checking, add to running
       setCheckingProfiles(prev => {
@@ -1198,7 +1198,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                       return (
                         <>
                           <button
-                            onClick={() => handleLaunchProfile(profile.id)}
+                            onClick={() => handleLaunchProfile(profile.id, profile.name)}
                             disabled={isRunning || isChecking}
                             className={`px-3 py-1 text-xs rounded transition-colors ${
                               isRunning || isChecking

@@ -175,7 +175,7 @@ export class GoLoginSDKService {
     }
   }
 
-  async launchProfile(profileId: string, options?: { headless?: boolean }): Promise<LaunchResult> {
+  async launchProfile(profileId: string, options?: { headless?: boolean; profileName?: string }): Promise<LaunchResult> {
     try {
       await this.ensureInitialized();
       console.log(`Launching profile ${profileId} with SDK...`);
@@ -217,6 +217,11 @@ export class GoLoginSDKService {
           '--disable-renderer-backgrounding',
           '--disable-backgrounding-occluded-windows'
         ];
+        
+        // Add profile name to browser icon in taskbar/dock
+        if (options?.profileName) {
+          commonFlags.push(`--app-name=${options.profileName}`);
+        }
         
         if (isMac) {
           // macOS: Add window-position to center the window
