@@ -47,7 +47,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   const [newProfileOS, setNewProfileOS] = useState<'win' | 'mac' | 'lin'>('win');
   const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = useState('proxy');
-  const [proxyType, setProxyType] = useState('custom');
+  const [proxyType, setProxyType] = useState('your');
   const [proxyConfig, setProxyConfig] = useState({
     type: 'auto',
     host: '',
@@ -64,6 +64,8 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     details?: Array<{ type: string; ip: string; ping: number; location?: string; flag?: string; selected?: boolean; error?: string }>;
   } | null>(null);
   const [checkingProxy, setCheckingProxy] = useState(false);
+  const [deviceIp, setDeviceIp] = useState<string>('');
+  const [loadingDeviceIp, setLoadingDeviceIp] = useState(false);
   const [proxyLocations, setProxyLocations] = useState<any[]>([]);
   const [runningProfiles, setRunningProfiles] = useState<Set<string>>(new Set());
   const [checkingProfiles, setCheckingProfiles] = useState<Set<string>>(new Set());
@@ -435,6 +437,20 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     }
   };
 
+  const fetchDeviceIp = async () => {
+    setLoadingDeviceIp(true);
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      setDeviceIp(data.ip || '');
+    } catch (error) {
+      console.error('Failed to fetch device IP:', error);
+      setDeviceIp('Unable to detect IP');
+    } finally {
+      setLoadingDeviceIp(false);
+    }
+  };
+
   const loadProxyLocations = async () => {
     try {
       // Temporarily comment out until type is fixed
@@ -616,8 +632,15 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
         // profileData.osSpec = 'win11';
       }
 
-      // Add proxy configuration (always required now)
-      if (proxyConfig.host && proxyConfig.port) {
+      // Add proxy configuration based on selected mode
+      if (proxyType === 'none') {
+        // Without proxy - use device's local IP
+        profileData.proxy = {
+          mode: 'none',
+          host: '',
+          port: 80
+        };
+      } else if (proxyType === 'your' && proxyConfig.host && proxyConfig.port) {
         profileData.proxy = {
           mode: proxyConfig.type === 'auto' ? 'http' : proxyConfig.type,
           host: proxyConfig.host,
@@ -689,6 +712,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
       setNewProfileOS('win');
       setNewProfileFolder('');
       setProfileNotes('');
+      setProxyType('your');
       setProxyConfig({
         type: 'auto',
         host: '',
@@ -1524,21 +1548,46 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
               )}
 
               {activeTab === 'proxy' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">Add or edit proxy</h3>
+                <div>
+                  {/* Proxy mode selector */}
+                  <div className="flex gap-2 mb-6">
+                    <button
+                      onClick={() => setProxyType('gologin')}
+                      className={`px-4 py-1.5 text-sm rounded border ${
+                        proxyType === 'gologin' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      Gologin proxy
+                    </button>
+                    <button
+                      onClick={() => setProxyType('your')}
+                      className={`px-4 py-1.5 text-sm rounded border ${
+                        proxyType === 'your' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      Your proxy
+                    </button>
+                    <button
+                      onClick={() => { setProxyType('none'); fetchDeviceIp(); }}
+                      className={`px-4 py-1.5 text-sm rounded border ${
+                        proxyType === 'none' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      Without proxy
+                    </button>
                     <button
                       onClick={handlePasteProxyForCreate}
-                      className="flex items-center gap-2 px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 border rounded"
                       title="Paste proxy from clipboard"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
-                      Paste
                     </button>
                   </div>
-                  
+
+                  {proxyType === 'your' && (
+                  <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Proxy Type, Host and Port
@@ -1689,6 +1738,35 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                           <span className="text-sm text-red-700">{proxyCheckResult.message}</span>
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+                  )}
+
+                  {proxyType === 'gologin' && (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      GoLogin proxy settings will be available soon.
+                    </div>
+                  )}
+
+                  {proxyType === 'none' && (
+                    <div className="py-6">
+                      <div className="text-center text-gray-500 text-sm mb-4">
+                        Profile will run without proxy.
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        {loadingDeviceIp ? (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                            Detecting your IP address...
+                          </div>
+                        ) : deviceIp ? (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                            <span className="text-sm text-green-700">Your IP:</span>
+                            <span className="text-sm font-medium text-green-800">{deviceIp}</span>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   )}
                 </div>

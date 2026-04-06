@@ -41,6 +41,22 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
   const [proxyChangeIpUrl, setProxyChangeIpUrl] = useState(profileProxy?.changeIpUrl || '');
   const [proxyDirty, setProxyDirty] = useState(false);
   const [checkingProxy, setCheckingProxy] = useState(false);
+  const [deviceIp, setDeviceIp] = useState<string>('');
+  const [loadingDeviceIp, setLoadingDeviceIp] = useState(false);
+
+  const fetchDeviceIp = async () => {
+    setLoadingDeviceIp(true);
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      setDeviceIp(data.ip || '');
+    } catch (error) {
+      console.error('Failed to fetch device IP:', error);
+      setDeviceIp('Unable to detect IP');
+    } finally {
+      setLoadingDeviceIp(false);
+    }
+  };
   const [proxyCheckResult, setProxyCheckResult] = useState<{
     status: 'success' | 'error';
     message: string;
@@ -92,6 +108,9 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
     loadExtensions();
     loadFullProfile();
     loadBrowserVersions();
+    if (initialProxyMode === 'none') {
+      fetchDeviceIp();
+    }
   }, [profileId]);
 
   const loadExtensions = async () => {
@@ -322,7 +341,13 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
               changeIpUrl: proxyChangeIpUrl || '',
             });
           } else if (proxyMode === 'none') {
-            await window.electronAPI.gologinRemoveProxy(profileId);
+            await window.electronAPI.gologinSetProxy(profileId, {
+              mode: 'none',
+              host: '',
+              port: 0,
+              username: '',
+              password: '',
+            });
           }
         } catch (err: any) {
           errors.push('Proxy: ' + err.message);
@@ -430,7 +455,7 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
                   Your proxy
                 </button>
                 <button
-                  onClick={() => { setProxyMode('none'); setProxyDirty(true); }}
+                  onClick={() => { setProxyMode('none'); setProxyDirty(true); fetchDeviceIp(); }}
                   className={`px-4 py-1.5 text-sm rounded border ${
                     proxyMode === 'none' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-gray-300 text-gray-600'
                   }`}
@@ -585,8 +610,23 @@ export function EditProfileModal({ profileId, profileName, profileProxy, onClose
               )}
 
               {proxyMode === 'none' && (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  Profile will run without proxy.
+                <div className="py-6">
+                  <div className="text-center text-gray-500 text-sm mb-4">
+                    Profile will run without proxy.
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    {loadingDeviceIp ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        Detecting your IP address...
+                      </div>
+                    ) : deviceIp ? (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                        <span className="text-sm text-green-700">Your IP:</span>
+                        <span className="text-sm font-medium text-green-800">{deviceIp}</span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>
