@@ -7,6 +7,8 @@ import { AuthService } from './services/AuthService';
 import { AutoSyncService } from './services/AutoSyncService';
 import { FirebaseService } from './services/FirebaseService';
 import { TotpSecret, MultiFactorResolver } from 'firebase/auth';
+import { extractDesign, cleanupTempFiles } from './services/DesignToolService';
+import sharp from 'sharp';
 
 // Load .env from multiple possible locations
 const possibleEnvPaths = [
@@ -584,6 +586,366 @@ class ChromeProfileTool {
       const token = this.authService.getCurrentToken();
       if (!token) throw new Error('Not authenticated');
       return await this.apiService.deleteExternalProxy(token, proxyId, reason);
+    });
+
+    // Design Tool IPC handlers
+    ipcMain.handle('design-tool:extract', async (_, options) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+        
+        const imageBuffer = Buffer.from(options.imageBase64, 'base64');
+        const result = await extractDesign(this.apiService, {
+          imageBuffer,
+          outputSize: options.outputSize,
+          designType: options.designType,
+          removeBackground: options.removeBackground,
+          upscaleEnabled: options.upscaleEnabled,
+          upscaleScale: options.upscaleScale,
+          redesignEnabled: options.redesignEnabled,
+          redesignPrompt: options.redesignPrompt,
+          cropCoordinates: options.cropCoordinates,
+          authToken: token,
+        });
+        return result;
+      } catch (error: any) {
+        console.error('[DesignTool IPC] Extract failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Image Gen IPC handler
+    ipcMain.handle('image-gen:generate', async (_, options) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+        
+        console.log('[ImageGen IPC] Starting mockup generation:', {
+          platform: options.platform,
+          mockupType: options.mockupType,
+          aspectRatio: options.aspectRatio,
+          frameSize: `${options.frameWidth}x${options.frameHeight}`,
+        });
+
+        // Step 0: Process image with frame data (matching processImageWithFrame from source)
+        const originalBuffer = Buffer.from(options.imageBase64, 'base64');
+        const metadata = await sharp(originalBuffer).metadata();
+        const origW = metadata.width || 0;
+        const origH = metadata.height || 0;
+        const imgScale = options.imageScale || 1;
+        const frameW = Math.round(options.frameWidth || 300);
+        const frameH = Math.round(options.frameHeight || 300);
+        const posX = Math.round(options.imagePositionX || 0);
+        const posY = Math.round(options.imagePositionY || 0);
+
+        // Scale original image
+        const scaledW = Math.round(origW * imgScale);
+        const scaledH = Math.round(origH * imgScale);
+        const scaledBuffer = await sharp(originalBuffer)
+          .resize(scaledW, scaledH, { fit: 'fill' })
+          .png()
+          .toBuffer();
+
+        // Calculate visible portion of scaled image within frame bounds
+        // (matching imagecopy behavior in PHP which auto-clips to canvas)
+        const srcX = Math.max(0, -posX);
+        const srcY = Math.max(0, -posY);
+        const dstX = Math.max(0, posX);
+        const dstY = Math.max(0, posY);
+        const copyW = Math.min(scaledW - srcX, frameW - dstX);
+        const copyH = Math.min(scaledH - srcY, frameH - dstY);
+
+        // Extract only the visible portion
+        const visibleBuffer = await sharp(scaledBuffer)
+          .extract({ left: srcX, top: srcY, width: Math.max(1, copyW), height: Math.max(1, copyH) })
+          .png()
+          .toBuffer();
+
+        // Create frame canvas and composite visible portion at position
+        const frameBuffer = await sharp({
+          create: { width: frameW, height: frameH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+        })
+          .composite([{ input: visibleBuffer, left: dstX, top: dstY }])
+          .png()
+          .toBuffer();
+
+        const processedBase64 = frameBuffer.toString('base64');
+        console.log('[ImageGen IPC] Frame processed:', `${frameW}x${frameH}`, `scaled: ${scaledW}x${scaledH}`, `pos: ${posX},${posY}`);
+
+        // Step 1-2: Call Gemini via server with processed image
+        const result = await this.apiService.designToolGenerateMockup(token, {
+          imageBase64: processedBase64,
+          platform: options.platform,
+          processingType: options.processingType,
+          mockupSide: options.mockupSide,
+          modelEnabled: options.modelEnabled,
+          gender: options.gender,
+          pose: options.pose,
+          ageMin: options.ageMin,
+          ageMax: options.ageMax,
+          customPrompt: options.customPrompt,
+          mockupType: options.mockupType,
+          color: options.color,
+          referenceImageBase64: options.referenceImageBase64,
+          aspectRatio: options.aspectRatio,
+        });
+
+        if (!result || !result.success || !result.imageBase64) {
+          throw new Error(result?.error || 'Mockup generation failed');
+        }
+
+        // Step 3-4: Scale Gemini result to target size and place on canvas (matching source)
+        const targetSize = options.aspectRatio === '9:16'
+          ? { width: 576, height: 1024 }
+          : { width: 1024, height: 1024 };
+
+        const geminiBuffer = Buffer.from(result.imageBase64, 'base64');
+        const geminiMeta = await sharp(geminiBuffer).metadata();
+        const gW = geminiMeta.width || 1024;
+        const gH = geminiMeta.height || 1024;
+
+        // Scale to fit target while maintaining aspect ratio
+        const scaleX = targetSize.width / gW;
+        const scaleY = targetSize.height / gH;
+        const fitScale = Math.min(scaleX, scaleY);
+        const newW = Math.round(gW * fitScale);
+        const newH = Math.round(gH * fitScale);
+
+        const scaledResult = await sharp(geminiBuffer)
+          .resize(newW, newH, { fit: 'fill' })
+          .png()
+          .toBuffer();
+
+        // Place on target-size canvas (centered)
+        const offsetX = Math.round((targetSize.width - newW) / 2);
+        const offsetY = Math.round((targetSize.height - newH) / 2);
+
+        const finalBuffer = await sharp({
+          create: { width: targetSize.width, height: targetSize.height, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+        })
+          .composite([{ input: scaledResult, left: offsetX, top: offsetY }])
+          .png()
+          .toBuffer();
+
+        const finalBase64 = finalBuffer.toString('base64');
+        console.log('[ImageGen IPC] Final output:', `${targetSize.width}x${targetSize.height}`);
+
+        return { success: true, imageBase64: finalBase64 };
+      } catch (error: any) {
+        console.error('[ImageGen IPC] Failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Upscale IPC handlers
+    ipcMain.handle('upscale:start', async (_, options) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Upscale IPC] Starting upscale:', {
+          model: options.model,
+          scale: options.scale,
+          enhanceFace: options.enhanceFace,
+        });
+
+        const result = await this.apiService.designToolUpscaleStart(
+          token,
+          options.imageBase64,
+          options.scale,
+          options.model,
+          options.enhanceFace,
+        );
+
+        if (result && result.success && result.taskId) {
+          return { success: true, taskId: result.taskId };
+        } else {
+          throw new Error(result?.error || 'Failed to start upscale task');
+        }
+      } catch (error: any) {
+        console.error('[Upscale IPC] Start failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('upscale:status', async (_, taskId: string) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        const result = await this.apiService.designToolUpscaleStatus(token, taskId);
+        return result;
+      } catch (error: any) {
+        console.error('[Upscale IPC] Status check failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('upscale:download', async (_, downloadUrl: string) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Upscale IPC] Downloading result...');
+        const result = await this.apiService.designToolUpscaleDownload(token, downloadUrl);
+
+        if (result && result.success && result.imageBase64) {
+          return { success: true, imageBase64: result.imageBase64, size: result.size };
+        } else {
+          throw new Error(result?.error || 'Failed to download upscale result');
+        }
+      } catch (error: any) {
+        console.error('[Upscale IPC] Download failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Video Script Generation IPC handler
+    ipcMain.handle('video:generate-script', async (_, imageBase64: string, duration: string, animation: string) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Video IPC] Generating script...', { duration, animation });
+        const result = await this.apiService.designToolVideoGenerateScript(token, imageBase64, duration, animation);
+        return result;
+      } catch (error: any) {
+        console.error('[Video IPC] Generate script failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Video Gen IPC handlers
+    ipcMain.handle('video:start', async (_, options) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Video IPC] Starting video gen:', {
+          aiModel: options.aiModel,
+          duration: options.duration,
+          dualMode: options.dualMode,
+        });
+
+        const result = await this.apiService.designToolVideoStart(token, {
+          imageBase64: options.imageBase64,
+          secondImageBase64: options.secondImageBase64,
+          prompt: options.prompt,
+          aiModel: options.aiModel,
+          duration: options.duration,
+          dualMode: options.dualMode,
+        });
+
+        if (result && result.success && result.taskId) {
+          return { success: true, taskId: result.taskId };
+        } else {
+          throw new Error(result?.error || 'Failed to start video task');
+        }
+      } catch (error: any) {
+        console.error('[Video IPC] Start failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('video:status', async (_, taskId: string, isMotionControl: boolean) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        const result = await this.apiService.designToolVideoStatus(token, taskId, isMotionControl);
+        return result;
+      } catch (error: any) {
+        console.error('[Video IPC] Status check failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('video:download', async (_, videoUrl: string) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Video IPC] Downloading video...');
+        const result = await this.apiService.designToolVideoDownload(token, videoUrl);
+
+        if (result && result.success && result.videoBase64) {
+          return { success: true, videoBase64: result.videoBase64, size: result.size };
+        } else {
+          throw new Error(result?.error || 'Failed to download video');
+        }
+      } catch (error: any) {
+        console.error('[Video IPC] Download failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('motion:start', async (_, options) => {
+      try {
+        const token = this.authService.getCurrentToken();
+        if (!token) throw new Error('Not authenticated');
+
+        console.log('[Motion IPC] Starting motion control:', {
+          mode: options.mode,
+          keepOriginalSound: options.keepOriginalSound,
+        });
+
+        const result = await this.apiService.designToolMotionStart(token, {
+          referenceImageBase64: options.referenceImageBase64,
+          videoUrl: options.videoUrl,
+          prompt: options.prompt,
+          mode: options.mode,
+          keepOriginalSound: options.keepOriginalSound,
+        });
+
+        if (result && result.success && result.taskId) {
+          return { success: true, taskId: result.taskId };
+        } else {
+          throw new Error(result?.error || 'Failed to start motion control task');
+        }
+      } catch (error: any) {
+        console.error('[Motion IPC] Start failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('design-tool:save-video', async (_, base64Data: string, filename?: string) => {
+      try {
+        const result = await dialog.showSaveDialog({
+          defaultPath: filename || `kling_video_${Date.now()}.mp4`,
+          filters: [{ name: 'Video Files', extensions: ['mp4'] }]
+        });
+        if (!result.canceled && result.filePath) {
+          const buffer = Buffer.from(base64Data, 'base64');
+          fs.writeFileSync(result.filePath, buffer);
+          return { success: true, filePath: result.filePath };
+        }
+        return { success: false, error: 'Cancelled' };
+      } catch (error: any) {
+        console.error('[Video IPC] Save video failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('design-tool:cleanup', async () => {
+      cleanupTempFiles();
+      return { success: true };
+    });
+
+    ipcMain.handle('design-tool:save-result', async (_, base64Data, filename) => {
+      try {
+        const result = await dialog.showSaveDialog({
+          defaultPath: filename || `design_result_${Date.now()}.png`,
+          filters: [{ name: 'PNG Images', extensions: ['png'] }]
+        });
+        if (!result.canceled && result.filePath) {
+          const buffer = Buffer.from(base64Data, 'base64');
+          fs.writeFileSync(result.filePath, buffer);
+          return { success: true, filePath: result.filePath };
+        }
+        return { success: false, error: 'Cancelled' };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
     });
 
     // Authentication IPC handlers

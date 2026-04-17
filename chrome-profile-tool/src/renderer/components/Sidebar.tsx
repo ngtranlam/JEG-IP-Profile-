@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar, Eye, EyeOff, Globe } from 'lucide-react';
+import { LayoutDashboard, Cloud, Settings, FolderOpen, LogOut, User, Users, KeyRound, ChevronDown, UserCog, Shield, Mail, Calendar, Eye, EyeOff, Globe, Scissors, Copy, Image, ZoomIn, Video } from 'lucide-react';
 import iegLogo from '../assets/Layer2.png';
 import { TwoFactorSetup } from './TwoFactorSetup';
 
@@ -11,9 +11,11 @@ interface User {
   roles: string;
 }
 
+type ViewType = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy' | 'design-clone' | 'design-imagegen' | 'design-upscale' | 'design-videogen';
+
 interface SidebarProps {
-  activeView: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy';
-  onViewChange: (view: 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy') => void;
+  activeView: ViewType;
+  onViewChange: (view: ViewType) => void;
   onLogout?: () => void;
   currentUser?: User | null;
 }
@@ -32,6 +34,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [showDesignTools, setShowDesignTools] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Check if user is Admin (roles="1") or Leader (roles="2")
@@ -135,7 +138,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
         />
       </div>
       
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -144,7 +147,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => onViewChange(item.id as 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy')}
+                  onClick={() => onViewChange(item.id as ViewType)}
                   className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
@@ -157,6 +160,52 @@ export function Sidebar({ activeView, onViewChange, onLogout, currentUser }: Sid
               </li>
             );
           })}
+
+          {/* Design Tool Dropdown */}
+          <li>
+            <button
+              onClick={() => setShowDesignTools(!showDesignTools)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeView.startsWith('design-')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+            >
+              <div className="flex items-center">
+                <Scissors className="mr-3 h-4 w-4" />
+                Design Tool
+              </div>
+              <ChevronDown className={`h-3 w-3 transition-transform ${showDesignTools ? 'rotate-180' : ''}`} />
+            </button>
+            {showDesignTools && (
+              <ul className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+                {[
+                  { id: 'design-clone' as ViewType, label: 'Clone', icon: Copy },
+                  { id: 'design-imagegen' as ViewType, label: 'Image Gen', icon: Image },
+                  { id: 'design-upscale' as ViewType, label: 'Upscale', icon: ZoomIn },
+                  { id: 'design-videogen' as ViewType, label: 'Video Gen', icon: Video },
+                ].map((sub) => {
+                  const SubIcon = sub.icon;
+                  const isSubActive = activeView === sub.id;
+                  return (
+                    <li key={sub.id}>
+                      <button
+                        onClick={() => onViewChange(sub.id)}
+                        className={`w-full flex items-center px-3 py-1.5 rounded-md text-sm transition-colors ${
+                          isSubActive
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                        }`}
+                      >
+                        <SubIcon className="mr-2 h-3.5 w-3.5" />
+                        {sub.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </li>
         </ul>
       </nav>
       

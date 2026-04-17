@@ -9,8 +9,12 @@ import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { TwoFactorVerification } from './components/TwoFactorVerification';
+import { CloneTool } from './components/design-tools/CloneTool';
+import { ImageGenTool } from './components/design-tools/ImageGenTool';
+import { UpscaleTool } from './components/design-tools/UpscaleTool';
+import { VideoGenTool } from './components/design-tools/VideoGenTool';
 
-type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy';
+type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy' | 'design-clone' | 'design-imagegen' | 'design-upscale' | 'design-videogen';
 
 function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
@@ -232,6 +236,14 @@ function App() {
             currentUser={currentUser}
           />
         );
+      case 'design-clone':
+        return <CloneTool />;
+      case 'design-imagegen':
+        return <ImageGenTool />;
+      case 'design-upscale':
+        return <UpscaleTool />;
+      case 'design-videogen':
+        return <VideoGenTool />;
       default:
         return (
           <Dashboard

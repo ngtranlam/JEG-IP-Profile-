@@ -315,6 +315,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
   extProxyDelete: (proxyId: string, reason?: string) =>
     ipcRenderer.invoke('ext-proxy:delete', proxyId, reason),
 
+  // Design Tool methods
+  designToolExtract: (options: any) =>
+    ipcRenderer.invoke('design-tool:extract', options),
+
+  designToolSaveResult: (base64Data: string, filename?: string) =>
+    ipcRenderer.invoke('design-tool:save-result', base64Data, filename),
+
+  designToolCleanup: () =>
+    ipcRenderer.invoke('design-tool:cleanup'),
+
+  // Image Gen methods
+  imageGenGenerate: (options: any) =>
+    ipcRenderer.invoke('image-gen:generate', options),
+
+  // Upscale methods
+  upscaleStart: (options: any) =>
+    ipcRenderer.invoke('upscale:start', options),
+  upscaleStatus: (taskId: string) =>
+    ipcRenderer.invoke('upscale:status', taskId),
+  upscaleDownload: (downloadUrl: string) =>
+    ipcRenderer.invoke('upscale:download', downloadUrl),
+
+  // Video Gen methods
+  videoGenerateScript: (imageBase64: string, duration: string, animation: string) =>
+    ipcRenderer.invoke('video:generate-script', imageBase64, duration, animation),
+  videoStart: (options: any) =>
+    ipcRenderer.invoke('video:start', options),
+  videoStatus: (taskId: string, isMotionControl: boolean) =>
+    ipcRenderer.invoke('video:status', taskId, isMotionControl),
+  videoDownload: (videoUrl: string) =>
+    ipcRenderer.invoke('video:download', videoUrl),
+  motionStart: (options: any) =>
+    ipcRenderer.invoke('motion:start', options),
+  designToolSaveVideo: (base64Data: string, filename?: string) =>
+    ipcRenderer.invoke('design-tool:save-video', base64Data, filename),
+
   // Event listeners
   onBrowserClosed: (callback: (profileId: string) => void) => {
     const listener = (_event: any, profileId: string) => callback(profileId);
@@ -508,6 +544,27 @@ declare global {
       extProxySellers: () => Promise<any>;
       extProxyUpdateSeller: (proxyId: string, sellerUsername: string | null) => Promise<any>;
       extProxyDelete: (proxyId: string, reason?: string) => Promise<any>;
+      
+      // Design Tool methods
+      designToolExtract: (options: any) => Promise<any>;
+      designToolSaveResult: (base64Data: string, filename?: string) => Promise<any>;
+      designToolCleanup: () => Promise<any>;
+      
+      // Image Gen methods
+      imageGenGenerate: (options: any) => Promise<any>;
+      
+      // Upscale methods
+      upscaleStart: (options: any) => Promise<any>;
+      upscaleStatus: (taskId: string) => Promise<any>;
+      upscaleDownload: (downloadUrl: string) => Promise<any>;
+      
+      // Video Gen methods
+      videoGenerateScript: (imageBase64: string, duration: string, animation: string) => Promise<any>;
+      videoStart: (options: any) => Promise<any>;
+      videoStatus: (taskId: string, isMotionControl: boolean) => Promise<any>;
+      videoDownload: (videoUrl: string) => Promise<any>;
+      motionStart: (options: any) => Promise<any>;
+      designToolSaveVideo: (base64Data: string, filename?: string) => Promise<any>;
       
       // GoLogin SDK methods
       gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') => Promise<any>;

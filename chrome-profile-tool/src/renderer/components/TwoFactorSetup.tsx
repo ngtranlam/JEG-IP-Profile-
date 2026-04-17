@@ -367,7 +367,7 @@ export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
               Keep these codes in a safe place. You can use them to access your account if you lose your authenticator device.
             </p>
           </div>
-
+   
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="grid grid-cols-2 gap-2">
               {recoveryCodes.map((code, index) => (

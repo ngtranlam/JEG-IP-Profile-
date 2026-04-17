@@ -940,4 +940,149 @@ export class ApiService {
       await this.gologinSDK.cleanup();
     }
   }
+
+  // ========== Design Tool API methods ==========
+
+  async designToolGetConfig(token: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/config', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  }
+
+  async designToolCallGemini(token: string, imageBase64: string, designType: string, customPrompt?: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/gemini', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ imageBase64, designType, customPrompt }),
+    });
+    return response;
+  }
+
+  async designToolCallPhotoroom(token: string, imageBase64: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/photoroom', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ imageBase64 }),
+    });
+    return response;
+  }
+
+  async designToolUpscaleStart(token: string, imageBase64: string, scale: number, model: string = 'upscayl-standard', enhanceFace: boolean = false): Promise<any> {
+    const response = await this.makeRequest('/design_tool/upscale_start', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ imageBase64, scale, model, enhanceFace }),
+    });
+    return response;
+  }
+
+  async designToolUpscaleStatus(token: string, taskId: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/upscale_status', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ taskId }),
+    });
+    return response;
+  }
+
+  async designToolUpscaleDownload(token: string, downloadUrl: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/upscale_download', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ downloadUrl }),
+    });
+    return response;
+  }
+
+  async designToolGenerateMockup(token: string, params: any): Promise<any> {
+    const response = await this.makeRequest('/design_tool/mockup_generate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    });
+    return response;
+  }
+
+  async designToolVideoGenerateScript(token: string, imageBase64: string, duration: string, animation: string = 'zoom'): Promise<any> {
+    const response = await this.makeRequest('/design_tool/video_generate_script', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ imageBase64, duration, animation }),
+    });
+    return response;
+  }
+
+  async designToolVideoStart(token: string, params: {
+    imageBase64: string;
+    secondImageBase64?: string;
+    prompt: string;
+    aiModel: string;
+    duration: string;
+    dualMode?: boolean;
+  }): Promise<any> {
+    const response = await this.makeRequest('/design_tool/video_start', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    });
+    return response;
+  }
+
+  async designToolVideoStatus(token: string, taskId: string, isMotionControl: boolean = false): Promise<any> {
+    const response = await this.makeRequest('/design_tool/video_status', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ taskId, isMotionControl }),
+    });
+    return response;
+  }
+
+  async designToolVideoDownload(token: string, videoUrl: string): Promise<any> {
+    const response = await this.makeRequest('/design_tool/video_download', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ videoUrl }),
+    });
+    return response;
+  }
+
+  async designToolMotionStart(token: string, params: {
+    referenceImageBase64: string;
+    videoUrl: string;
+    prompt?: string;
+    mode: string;
+    keepOriginalSound: string;
+  }): Promise<any> {
+    const response = await this.makeRequest('/design_tool/motion_start', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    });
+    return response;
+  }
 }
