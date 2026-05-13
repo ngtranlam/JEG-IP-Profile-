@@ -952,13 +952,13 @@ export class ApiService {
     return response.data;
   }
 
-  async designToolCallGemini(token: string, imageBase64: string, designType: string, customPrompt?: string): Promise<any> {
+  async designToolCallGemini(token: string, imageBase64: string, designType: string, customPrompt?: string, aiModel?: string): Promise<any> {
     const response = await this.makeRequest('/design_tool/gemini', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ imageBase64, designType, customPrompt }),
+      body: JSON.stringify({ imageBase64, designType, customPrompt, aiModel }),
     });
     return response;
   }

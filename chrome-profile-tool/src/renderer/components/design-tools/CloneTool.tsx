@@ -20,6 +20,7 @@ export function CloneTool() {
   const [resultFitView, setResultFitView] = useState(true);
 
   // Clone options state
+  const [aiModel, setAiModel] = useState('gemini-2.5-flash-image');
   const [outputSize, setOutputSize] = useState('4500x4500');
   const [designType, setDesignType] = useState<'print' | 'embroidery'>('print');
   const [removeBackground, setRemoveBackground] = useState(true);
@@ -289,6 +290,7 @@ export function CloneTool() {
         upscaleScale: scaleValues[upscaleScale],
         redesignEnabled,
         redesignPrompt,
+        aiModel,
         cropCoordinates: {
           x: Math.round(cropSelection.x),
           y: Math.round(cropSelection.y),
@@ -302,6 +304,12 @@ export function CloneTool() {
         setDownloadBase64(result.downloadBase64 || result.imageBase64);
         setStatusText(`Processing completed in ${((result.processingTime || 0) / 1000).toFixed(1)}s`);
         setProgress(100);
+
+        // Track usage to report API (fire-and-forget)
+        window.electronAPI.reportTrackUsage('clone', {
+          remove_background: removeBackground,
+          upscale_enabled: upscaleEnabled,
+        }).then((r: any) => console.log('[ReportAPI] clone track:', r)).catch((e: any) => console.warn('[ReportAPI] clone track error:', e));
       } else {
         setStatusText(`Error: ${result.error || 'Unknown error'}`);
         setProgress(0);
@@ -313,7 +321,7 @@ export function CloneTool() {
     } finally {
       setIsProcessing(false);
     }
-  }, [uploadedImage, cropSelection, outputSize, designType, removeBackground, upscaleEnabled, upscaleScale, redesignEnabled, redesignPrompt]);
+  }, [uploadedImage, cropSelection, outputSize, designType, removeBackground, upscaleEnabled, upscaleScale, redesignEnabled, redesignPrompt, aiModel]);
 
   // --- Download ---
   const handleDownload = useCallback(async () => {
@@ -344,6 +352,7 @@ export function CloneTool() {
     setCropSelection(null);
     setNaturalWidth(0);
     setNaturalHeight(0);
+    setAiModel('gemini-2.5-flash-image');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -365,6 +374,24 @@ export function CloneTool() {
               className="hidden"
               onChange={handleFileUpload}
             />
+
+            {/* AI Model */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Model:</label>
+              <select
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="gemini-2.5-flash-image">Nano Banana 2</option>
+                <option value="gemini-3-pro-image-preview">Nano Banana Pro</option>
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1 italic">
+                {aiModel === 'gemini-2.5-flash-image'
+                  ? 'Tốc độ xử lý nhanh, ít lỗi, phù hợp với design đơn giản'
+                  : 'Xử lý chi tiết tốt, tốc độ chậm hơn, có thể lỗi nếu design có mặt người, watermark bản quyền'}
+              </p>
+            </div>
 
             {/* Output Size */}
             <div>

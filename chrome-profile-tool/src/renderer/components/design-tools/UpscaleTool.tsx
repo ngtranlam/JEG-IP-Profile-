@@ -204,6 +204,13 @@ export function UpscaleTool() {
 
               setProgress(100);
               setStatusText('Upscaling completed successfully!');
+
+              // Track usage to report API (fire-and-forget)
+              (window as any).electronAPI.reportTrackUsage('upscale', {
+                model: selectedModel,
+                scale: parseInt(outputScale),
+              }).catch(() => {});
+
               resolve();
             }
 

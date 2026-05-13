@@ -8,6 +8,7 @@ import { AutoSyncService } from './services/AutoSyncService';
 import { FirebaseService } from './services/FirebaseService';
 import { TotpSecret, MultiFactorResolver } from 'firebase/auth';
 import { extractDesign, cleanupTempFiles } from './services/DesignToolService';
+import { DesignToolReportService } from './services/DesignToolReportService';
 import sharp from 'sharp';
 
 // Load .env from multiple possible locations
@@ -67,6 +68,7 @@ class ChromeProfileTool {
   private firebaseService: FirebaseService;
   private pendingTotpSecret: TotpSecret | null = null;
   private pendingMfaResolver: MultiFactorResolver | null = null;
+  private reportService: DesignToolReportService;
 
   constructor() {
     const apiBaseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
@@ -74,6 +76,7 @@ class ChromeProfileTool {
     this.authService = new AuthService(apiBaseUrl);
     this.autoSyncService = new AutoSyncService(this.apiService, this.authService);
     this.firebaseService = new FirebaseService();
+    this.reportService = new DesignToolReportService();
   }
 
   async initialize() {
@@ -606,10 +609,40 @@ class ChromeProfileTool {
           redesignPrompt: options.redesignPrompt,
           cropCoordinates: options.cropCoordinates,
           authToken: token,
+          aiModel: options.aiModel,
         });
         return result;
       } catch (error: any) {
         console.error('[DesignTool IPC] Extract failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Design Tool Report IPC handlers
+    ipcMain.handle('report:track-usage', async (_, toolType, optionsUsed, requestId) => {
+      try {
+        // Always ensure username is set from current auth
+        const user = this.authService.getCurrentUser();
+        if (user?.userName) {
+          this.reportService.setUsername(user.userName);
+        }
+        console.log(`[ReportAPI IPC] Tracking: ${toolType}, user=${this.reportService.getUsername()}`);
+        return await this.reportService.trackUsage(toolType, optionsUsed || {}, requestId);
+      } catch (error: any) {
+        console.error('[ReportAPI IPC] Track usage failed:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('report:usage-report', async (_, startDate, endDate) => {
+      try {
+        const user = this.authService.getCurrentUser();
+        if (user?.userName) {
+          this.reportService.setUsername(user.userName);
+        }
+        return await this.reportService.getUsageReport(startDate, endDate);
+      } catch (error: any) {
+        console.error('[ReportAPI IPC] Get report failed:', error.message);
         return { success: false, error: error.message };
       }
     });
@@ -1014,6 +1047,12 @@ class ChromeProfileTool {
           };
         }
 
+        // Set username for report service
+        if (result.user?.userName) {
+          this.reportService.setUsername(result.user.userName);
+          console.log(`[ReportAPI] Username set: ${result.user.userName}`);
+        }
+
         return { success: true, data: result };
       } catch (error: any) {
         console.error('[Login] Error occurred:', error);
@@ -1022,6 +1061,7 @@ class ChromeProfileTool {
     });
 
     ipcMain.handle('auth:logout', async () => {
+      this.reportService.setUsername('');
       await this.authService.logout();
     });
 
@@ -1095,6 +1135,10 @@ class ChromeProfileTool {
         const loginResult = await this.authService.loginWithFirebaseToken(firebaseToken);
         console.log('[ForcePasswordChange] Backend login successful');
         
+        if (loginResult.user?.userName) {
+          this.reportService.setUsername(loginResult.user.userName);
+        }
+        
         return { success: true, data: loginResult };
       } catch (error: any) {
         console.error('[ForcePasswordChange] Error:', error);
@@ -1103,7 +1147,13 @@ class ChromeProfileTool {
     });
 
     ipcMain.handle('auth:validate-token', async () => {
-      return await this.authService.validateToken();
+      const result = await this.authService.validateToken();
+      // Ensure report service username is set after token validation
+      if (result?.userName && !this.reportService.getUsername()) {
+        this.reportService.setUsername(result.userName);
+        console.log(`[ReportAPI] Username set from validate-token: ${result.userName}`);
+      }
+      return result;
     });
 
     ipcMain.handle('auth:get-current-user', async () => {
@@ -1246,6 +1296,10 @@ class ChromeProfileTool {
           console.log('[2FA Verify] Calling backend loginWithFirebaseToken...');
           const loginResult = await this.authService.loginWithFirebaseToken(firebaseToken);
           console.log('[2FA Verify] Backend login successful');
+          
+          if (loginResult.user?.userName) {
+            this.reportService.setUsername(loginResult.user.userName);
+          }
           
           return { 
             success: true,

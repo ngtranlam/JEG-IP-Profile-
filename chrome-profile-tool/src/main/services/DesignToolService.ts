@@ -29,6 +29,7 @@ interface ExtractOptions {
   redesignPrompt: string;
   cropCoordinates: CropCoordinates;
   authToken: string;
+  aiModel?: string;
 }
 
 interface ExtractResult {
@@ -87,11 +88,11 @@ async function cropImage(imageBuffer: Buffer, crop: CropCoordinates): Promise<Bu
 /**
  * Call Gemini API via server proxy
  */
-async function callGeminiApi(apiService: ApiService, token: string, imageBuffer: Buffer, designType: string, customPrompt?: string): Promise<Buffer> {
-  console.log('[DesignTool] Calling Gemini API via server, type:', designType);
+async function callGeminiApi(apiService: ApiService, token: string, imageBuffer: Buffer, designType: string, customPrompt?: string, aiModel?: string): Promise<Buffer> {
+  console.log('[DesignTool] Calling Gemini API via server, type:', designType, 'model:', aiModel || 'default');
   
   const imageBase64 = imageBuffer.toString('base64');
-  const result = await apiService.designToolCallGemini(token, imageBase64, designType, customPrompt || undefined);
+  const result = await apiService.designToolCallGemini(token, imageBase64, designType, customPrompt || undefined, aiModel);
   
   if (result.success && result.imageBase64) {
     console.log('[DesignTool] Got image from Gemini API via server');
@@ -253,10 +254,10 @@ export async function extractDesign(apiService: ApiService, options: ExtractOpti
     let processedBuffer: Buffer;
     if (options.redesignEnabled && options.redesignPrompt) {
       progressCallback?.('Redesigning with AI...', 25);
-      processedBuffer = await callGeminiApi(apiService, token, croppedBuffer, 'custom', options.redesignPrompt);
+      processedBuffer = await callGeminiApi(apiService, token, croppedBuffer, 'custom', options.redesignPrompt, options.aiModel);
     } else {
       progressCallback?.(`Extracting ${options.designType} design with AI...`, 25);
-      processedBuffer = await callGeminiApi(apiService, token, croppedBuffer, options.designType);
+      processedBuffer = await callGeminiApi(apiService, token, croppedBuffer, options.designType, undefined, options.aiModel);
     }
     
     // Step 3: Background removal (via server)

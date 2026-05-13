@@ -158,6 +158,12 @@ export function VideoGenTool() {
               setResultVideoBase64(dlResult.videoBase64);
               setProgress(100);
               setStatusText('Video generated successfully!');
+
+              // Track usage to report API (fire-and-forget)
+              (window as any).electronAPI.reportTrackUsage('video', {
+                ai_model: aiModel,
+                duration: parseInt(duration),
+              }).catch(() => {});
             } else {
               setStatusText('Video completed but download failed');
             }
@@ -334,6 +340,9 @@ export function VideoGenTool() {
         setVideoScript(result.script);
         setScriptSaved(false);
         setStatusText('Script generated successfully!');
+
+        // Track script_gen usage (fire-and-forget)
+        (window as any).electronAPI.reportTrackUsage('script_gen', {}).catch(() => {});
       } else {
         setStatusText(result?.error || 'Failed to generate script');
       }

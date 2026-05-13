@@ -250,6 +250,12 @@ export function ImageGenTool() {
         setProgress(100);
         setStatusText('Processing completed successfully!');
         setStatusType('success');
+
+        // Track usage to report API (fire-and-forget)
+        (window as any).electronAPI.reportTrackUsage('mockup', {
+          remove_background: false,
+          upscale_enabled: false,
+        }).catch(() => {});
       } else {
         throw new Error(result.error || 'Unknown error');
       }

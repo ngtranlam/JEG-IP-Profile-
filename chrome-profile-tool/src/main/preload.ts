@@ -351,6 +351,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   designToolSaveVideo: (base64Data: string, filename?: string) =>
     ipcRenderer.invoke('design-tool:save-video', base64Data, filename),
 
+  // Design Tool Report API
+  reportTrackUsage: (toolType: string, optionsUsed?: any, requestId?: string) =>
+    ipcRenderer.invoke('report:track-usage', toolType, optionsUsed, requestId),
+  reportGetUsage: (startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke('report:usage-report', startDate, endDate),
+
   // Event listeners
   onBrowserClosed: (callback: (profileId: string) => void) => {
     const listener = (_event: any, profileId: string) => callback(profileId);
@@ -565,6 +571,10 @@ declare global {
       videoDownload: (videoUrl: string) => Promise<any>;
       motionStart: (options: any) => Promise<any>;
       designToolSaveVideo: (base64Data: string, filename?: string) => Promise<any>;
+      
+      // Design Tool Report API
+      reportTrackUsage: (toolType: string, optionsUsed?: any, requestId?: string) => Promise<any>;
+      reportGetUsage: (startDate?: string, endDate?: string) => Promise<any>;
       
       // GoLogin SDK methods
       gologinSDKCreateProfile: (name: string, os?: 'win' | 'mac' | 'lin') => Promise<any>;
