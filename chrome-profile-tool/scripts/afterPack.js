@@ -46,6 +46,13 @@ exports.default = async function(context) {
     await installSqlite3Prebuilt(targetArch, sqlite3UnpackedDir, sqlite3BinaryDir, sqlite3BinaryPath);
   }
 
+  // --- Rebuild sharp for target architecture ---
+  const sharpUnpackedDir = path.join(unpackedDir, 'node_modules', 'sharp');
+  if (fs.existsSync(sharpUnpackedDir)) {
+    console.log(`[afterPack] Rebuilding sharp for ${targetArch}...`);
+    await rebuildSharp(targetArch, sharpUnpackedDir);
+  }
+
   // --- Sign the app ---
   console.log('Signing macOS app with ad-hoc identity:', appPath);
   try {
@@ -97,5 +104,59 @@ async function installSqlite3Prebuilt(targetArch, sqlite3UnpackedDir, sqlite3Bin
     try {
       execSync(`rm -rf "${tmpDir}"`, { stdio: 'ignore' });
     } catch (e) { /* ignore cleanup errors */ }
+  }
+}
+
+async function rebuildSharp(targetArch, sharpUnpackedDir) {
+  const unpackedNodeModules = path.dirname(sharpUnpackedDir);
+  const imgDir = path.join(unpackedNodeModules, '@img');
+  const bindingPkg = `sharp-darwin-${targetArch}`;
+  const libvipsPkg = `sharp-libvips-darwin-${targetArch}`;
+
+  try {
+    // Check if platform-specific binding exists
+    const bindingDir = path.join(imgDir, bindingPkg);
+    const libvipsDir = path.join(imgDir, libvipsPkg);
+
+    const needsBinding = !fs.existsSync(bindingDir);
+    const needsLibvips = !fs.existsSync(libvipsDir);
+
+    if (!needsBinding && !needsLibvips) {
+      console.log(`[afterPack] sharp packages for darwin-${targetArch} already present`);
+      return;
+    }
+
+    // Install missing platform-specific packages into unpacked node_modules
+    const tmpDir = path.join(os.tmpdir(), `sharp_install_${targetArch}_${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const packagesToInstall = [];
+    if (needsBinding) packagesToInstall.push(`@img/${bindingPkg}`);
+    if (needsLibvips) packagesToInstall.push(`@img/${libvipsPkg}`);
+
+    console.log(`[afterPack] Installing sharp platform packages for ${targetArch}: ${packagesToInstall.join(', ')}`);
+    execSync(`npm install --no-save --force --prefix "${tmpDir}" ${packagesToInstall.join(' ')}`, {
+      stdio: 'inherit',
+    });
+
+    // Copy installed packages to unpacked node_modules/@img/
+    fs.mkdirSync(imgDir, { recursive: true });
+
+    for (const pkg of packagesToInstall) {
+      const pkgName = pkg.replace('@img/', '');
+      const srcDir = path.join(tmpDir, 'node_modules', '@img', pkgName);
+      const destDir = path.join(imgDir, pkgName);
+      if (fs.existsSync(srcDir)) {
+        execSync(`cp -R "${srcDir}" "${destDir}"`, { stdio: 'inherit' });
+        console.log(`[afterPack] Installed ${pkg} -> ${destDir}`);
+      }
+    }
+
+    // Clean up
+    try { execSync(`rm -rf "${tmpDir}"`, { stdio: 'ignore' }); } catch (e) { /* ignore */ }
+
+    console.log(`[afterPack] sharp platform packages installed for ${targetArch}`);
+  } catch (error) {
+    console.error(`[afterPack] Failed to install sharp packages for ${targetArch}:`, error.message);
   }
 }

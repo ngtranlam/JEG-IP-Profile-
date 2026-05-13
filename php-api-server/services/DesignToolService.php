@@ -1,8 +1,6 @@
 <?php
 
 class DesignToolService {
-    private $geminiApiKey;
-    private $geminiModel;
     private $photoroomApiKey;
     private $upscaylApiKey;
     private $klingAccessKey;
@@ -28,8 +26,6 @@ class DesignToolService {
     ];
 
     public function __construct() {
-        $this->geminiApiKey = $_ENV['GEMINI_API_KEY'] ?? '';
-        $this->geminiModel = $_ENV['GEMINI_MODEL'] ?? 'gemini-2.5-flash-image';
         $this->photoroomApiKey = $_ENV['PHOTOROOM_API_KEY'] ?? '';
         $this->upscaylApiKey = $_ENV['UPSCAYL_API_KEY'] ?? '';
         $this->klingAccessKey = $_ENV['KLING_ACCESS_KEY'] ?? '';
@@ -141,7 +137,7 @@ class DesignToolService {
             'design_types' => ['print', 'embroidery'],
             'upscale_models' => ['upscayl-standard-4x'],
             'upscale_scales' => [2, 4, 8],
-            'has_gemini' => !empty($this->geminiApiKey),
+            'has_gemini' => !empty($this->serviceAccountPath),
             'has_photoroom' => !empty($this->photoroomApiKey),
             'has_upscayl' => !empty($this->upscaylApiKey),
         ];
