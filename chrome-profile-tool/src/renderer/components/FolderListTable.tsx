@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, RefreshCw, Search, Edit3, Trash2, User, X } from 'lucide-react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface FolderItem {
   folder_id: string;
@@ -191,7 +192,7 @@ export function FolderListTable({ currentUser }: FolderListTableProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg">Loading folders...</div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

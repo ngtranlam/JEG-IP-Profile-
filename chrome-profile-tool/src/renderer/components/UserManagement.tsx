@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, X, Save, UserCheck, UserX, Lock, Unlock } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Save, UserCheck, UserX, Lock, Unlock, Search } from 'lucide-react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface User {
   id: number;
@@ -22,6 +23,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     userName: '',
     password: '',
@@ -173,10 +175,22 @@ export function UserManagement({ currentUser }: UserManagementProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading users...</div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
+
+  // Filter users based on search term
+  const filteredUsers = users.filter(user => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      user.fullName?.toLowerCase().includes(search) ||
+      user.userName?.toLowerCase().includes(search) ||
+      user.email?.toLowerCase().includes(search) ||
+      user.phone?.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -189,6 +203,31 @@ export function UserManagement({ currentUser }: UserManagementProps) {
           <Plus className="w-5 h-5" />
           Add User
         </button>
+      </div>
+
+      {/* Search */}
+      <div className="px-6 pb-4">
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border rounded-lg">
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, username, email, or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 text-sm border-0 bg-transparent focus:outline-none"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+          <span className="text-xs text-gray-400 whitespace-nowrap">
+            {filteredUsers.length} of {users.length}
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6">
@@ -223,7 +262,14 @@ export function UserManagement({ currentUser }: UserManagementProps) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user, index) => (
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    {searchTerm ? 'No users found matching your search.' : 'No users available.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user, index) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {index + 1}
@@ -288,7 +334,8 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>

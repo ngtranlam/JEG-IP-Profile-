@@ -1,0 +1,21 @@
+
+    /**
+     * Mark sync log entry as completed or failed
+     */
+    private function completeSyncLog($logId, $status, $foldersCount = 0, $profilesCount = 0, $errorMessage = null) {
+        $sql = "UPDATE gologin_sync_log
+                SET status = :status,
+                    folders_synced = :folders_synced,
+                    profiles_synced = :profiles_synced,
+                    error_message = :error_message,
+                    completed_at = NOW()
+                WHERE id = :log_id";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':status', $status);
+        $stmt->bindParam(':folders_synced', $foldersCount, PDO::PARAM_INT);
+        $stmt->bindParam(':profiles_synced', $profilesCount, PDO::PARAM_INT);
+        $stmt->bindParam(':error_message', $errorMessage);
+        $stmt->bindParam(':log_id', $logId, PDO::PARAM_INT);
+        $stmt->execute();
+    }

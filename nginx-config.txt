@@ -1,0 +1,29 @@
+server {
+    server_name jegbrowser.com www.jegbrowser.com;
+    root /var/www/jegbrowser.com;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    }
+
+    location ~ /\.env { deny all; }
+    location ~ /\.git { deny all; }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/jegbrowser.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jegbrowser.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name jegbrowser.com www.jegbrowser.com;
+    return 301 https://$host$request_uri;
+}

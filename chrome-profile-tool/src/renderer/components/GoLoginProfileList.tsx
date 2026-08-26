@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Play, Trash2, Settings, Folder, Tag, Globe, X, Upload, FolderOpen, Check, Edit } from 'lucide-react';
 import { EditProfileModal } from './EditProfileModal';
+import { LoadingSpinner } from './LoadingSpinner';
+import { FlagIcon } from './FlagIcon';
 
 interface GoLoginProfile {
   id: string;
@@ -1045,7 +1047,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   if (loading && profiles.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg">Loading GoLogin profiles...</div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -1358,7 +1360,11 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
                       
                       return (
                         <>
-                          <span className="text-sm">{countryInfo.flag}</span>
+                          {countryCode ? (
+                            <FlagIcon countryCode={countryCode} className="w-5 h-4 inline-block mr-1" title={countryInfo.name} />
+                          ) : (
+                            <span className="text-sm mr-1">🌐</span>
+                          )}
                           <span className="text-xs text-gray-600">{displayText}</span>
                           <button
                             onClick={() => handleOpenEditProxy(profile)}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash2, X, Save, Users, UserPlus, UserMinus, Crown, ChevronDown, ChevronRight, Search, Globe, FileText } from 'lucide-react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface User {
   id: number;
@@ -339,7 +340,7 @@ export function TeamManagement({ currentUser }: TeamManagementProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading teams...</div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

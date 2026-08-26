@@ -13,6 +13,7 @@ import { CloneTool } from './components/design-tools/CloneTool';
 import { ImageGenTool } from './components/design-tools/ImageGenTool';
 import { UpscaleTool } from './components/design-tools/UpscaleTool';
 import { VideoGenTool } from './components/design-tools/VideoGenTool';
+import { FeatureLocked } from './components/FeatureLocked';
 
 type ActiveView = 'dashboard' | 'profiles' | 'folders' | 'users' | 'teams' | 'proxy' | 'design-clone' | 'design-imagegen' | 'design-upscale' | 'design-videogen';
 
@@ -231,19 +232,11 @@ function App() {
           />
         );
       case 'proxy':
-        return (
-          <ProxyManagement
-            currentUser={currentUser}
-          />
-        );
       case 'design-clone':
-        return <CloneTool />;
       case 'design-imagegen':
-        return <ImageGenTool />;
       case 'design-upscale':
-        return <UpscaleTool />;
       case 'design-videogen':
-        return <VideoGenTool />;
+        return <FeatureLocked onBackToDashboard={() => setActiveView('dashboard')} />;
       default:
         return (
           <Dashboard

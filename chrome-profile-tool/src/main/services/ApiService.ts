@@ -11,7 +11,7 @@ export class ApiService {
 
   constructor() {
     // Use production URL by default, fallback to env variable for development
-    this.baseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
+    this.baseUrl = process.env.API_BASE_URL || 'https://jegbrowser.com/api';
     console.log('API Service initialized with base URL:', this.baseUrl);
     
     // Initialize GoLogin SDK if token is available
@@ -46,7 +46,14 @@ export class ApiService {
       console.log(`Making API request: ${requestOptions.method || 'GET'} ${url}`);
       
       const response = await fetch(url, requestOptions);
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error(`JSON parse failed for ${url}. Response text:`, text.substring(0, 500));
+        throw new Error(`Invalid JSON response from server: ${text.substring(0, 200)}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);

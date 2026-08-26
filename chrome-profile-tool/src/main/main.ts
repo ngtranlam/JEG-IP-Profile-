@@ -71,7 +71,7 @@ class ChromeProfileTool {
   private reportService: DesignToolReportService;
 
   constructor() {
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://profile.jegdn.com/api';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://jegbrowser.com/api';
     this.apiService = new ApiService();
     this.authService = new AuthService(apiBaseUrl);
     this.autoSyncService = new AutoSyncService(this.apiService, this.authService);
@@ -107,13 +107,9 @@ class ChromeProfileTool {
     });
 
     // Load the React app
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = !app.isPackaged;
     if (isDev) {
-      this.mainWindow.loadURL(
-        isDev
-          ? 'http://localhost:5173'
-          : `file://${path.join(__dirname, '../../renderer/index.html')}`
-      );
+      this.mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000');
       // TEMPORARY: Open DevTools for debugging
       this.mainWindow.webContents.openDevTools();
     } else {
