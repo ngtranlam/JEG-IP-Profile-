@@ -37,6 +37,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
   const [searchTerm, setSearchTerm] = useState('');
   const searchTermRef = useRef('');
   const [currentPage, setCurrentPage] = useState(1);
+  const loadProfilesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentPageRef = useRef(1);
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [selectedFolder, setSelectedFolder] = useState<string>(initialFolderId || '');
@@ -154,7 +155,13 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     fetchRunningProfiles();
     // Poll global running status every 15 seconds
     const interval = setInterval(fetchRunningProfiles, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Cleanup debounce timeout
+      if (loadProfilesTimeoutRef.current) {
+        clearTimeout(loadProfilesTimeoutRef.current);
+      }
+    };
   }, [currentUser]);
 
   // Close context menu on outside click
@@ -329,9 +336,9 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  // Reload profiles when page, search, or folder changes
+  // Reload profiles when page, search, or folder changes (debounced)
   useEffect(() => {
-    loadProfiles();
+    loadProfiles(false); // Debounced for search/filter changes
   }, [currentPage, searchTerm, selectedFolder]);
 
   const syncData = async () => {
@@ -355,18 +362,24 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     }
   };
 
-  const loadProfiles = async () => {
-    try {
-      setLoading(true);
-      // Always use refs for the latest values (avoids stale closure issues from onBrowserClosed etc.)
-      const page = currentPageRef.current;
-      const search = searchTermRef.current;
-      const folder = selectedFolderRef.current;
-      console.log('Loading profiles with filters:', { 
-        page, 
-        search, 
-        folder 
-      });
+  const loadProfiles = async (immediate = false) => {
+    // Debounce to avoid excessive API calls
+    if (!immediate && loadProfilesTimeoutRef.current) {
+      clearTimeout(loadProfilesTimeoutRef.current);
+    }
+    
+    const executeLoad = async () => {
+      try {
+        setLoading(true);
+        // Always use refs for the latest values (avoids stale closure issues from onBrowserClosed etc.)
+        const page = currentPageRef.current;
+        const search = searchTermRef.current;
+        const folder = selectedFolderRef.current;
+        console.log('Loading profiles with filters:', { 
+          page, 
+          search, 
+          folder 
+        });
       
       const result = await window.electronAPI.localDataGetProfiles(
         page,
@@ -397,16 +410,23 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
         folder_names: profile.folder_names || null,
       }));
       
-      console.log('Transformed profiles:', transformedProfiles);
-      console.log('Setting profiles state with', transformedProfiles.length, 'profiles');
-      setProfiles(transformedProfiles);
-      setTotalProfiles(result.total || transformedProfiles.length);
-    } catch (error) {
-      console.error('Failed to load profiles from database:', error);
-      setProfiles([]);
-      setTotalProfiles(0);
-    } finally {
-      setLoading(false);
+        console.log('Transformed profiles:', transformedProfiles);
+        console.log('Setting profiles state with', transformedProfiles.length, 'profiles');
+        setProfiles(transformedProfiles);
+        setTotalProfiles(result.total || transformedProfiles.length);
+      } catch (error) {
+        console.error('Failed to load profiles from database:', error);
+        setProfiles([]);
+        setTotalProfiles(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (immediate) {
+      await executeLoad();
+    } else {
+      loadProfilesTimeoutRef.current = setTimeout(executeLoad, 300);
     }
   };
 
@@ -724,7 +744,7 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
         changeIpUrl: ''
       });
       setProxyCheckResult({ status: null, message: '' });
-      await loadProfiles();
+      await loadProfiles(true); // Immediate reload after create
     } catch (error) {
       console.error('Error creating profile:', error);
       alert('Failed to create profile. Please try again.');
@@ -739,12 +759,12 @@ export function GoLoginProfileList({ onProfileLaunch, onRefresh, currentUser, in
     try {
       await window.electronAPI.localDataDeleteProfile(profileId);
       alert('Profile deleted successfully!');
-      await loadProfiles();
+      await loadProfiles(true); // Immediate reload after delete
     } catch (error: any) {
       console.error('Failed to delete profile:', error);
       alert('Failed to delete profile. Please try again.');
       // Reload on error to sync state
-      await loadProfiles();
+      await loadProfiles(true);
     }
   };
 
