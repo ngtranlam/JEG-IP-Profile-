@@ -110,6 +110,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "firebase-key.json",
+        "to": "firebase-key.json",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asarUnpack": [

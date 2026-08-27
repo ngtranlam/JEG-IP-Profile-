@@ -3,3 +3,5 @@ jegtech-*.json
 php-api-server/jegtech-*.json
 *firebase-adminsdk*.json
 jeg-profiles-*.json
+firebase-key.json
+chrome-profile-tool/firebase-key.json
