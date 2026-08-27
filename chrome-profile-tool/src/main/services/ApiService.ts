@@ -11,7 +11,7 @@ export class ApiService {
 
   constructor() {
     // Use production URL by default, fallback to env variable for development
-    this.baseUrl = process.env.API_BASE_URL || 'https://jegbrowser.com';
+    this.baseUrl = process.env.API_BASE_URL || 'https://jegbrowser.com/api';
     console.log('API Service initialized with base URL:', this.baseUrl);
     
     // Initialize GoLogin SDK if token is available
