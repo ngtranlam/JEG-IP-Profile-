@@ -93,6 +93,7 @@
     "appId": "com.jeg.chrome-profile-tool",
     "productName": "JEG Anditect Browser",
     "afterPack": "./scripts/afterPack.js",
+    "publish": null,
     "directories": {
       "output": "release",
       "buildResources": "build"
