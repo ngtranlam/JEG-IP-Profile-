@@ -1,3 +1,5 @@
 # Service account keys (secrets)
 jegtech-*.json
 php-api-server/jegtech-*.json
+*firebase-adminsdk*.json
+jeg-profiles-*.json
