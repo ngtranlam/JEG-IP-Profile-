@@ -87,6 +87,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Install prebuild-install globally
+        run: npm install -g prebuild-install
+      
+      - name: Ensure sqlite3 prebuilts for both architectures
+        run: |
+          cd node_modules/sqlite3
+          npx prebuild-install -r napi --platform darwin --arch x64 || echo "x64 prebuilt not available"
+          npx prebuild-install -r napi --platform darwin --arch arm64 || echo "arm64 prebuilt not available"
+        working-directory: chrome-profile-tool
+      
       - name: Build macOS app
         run: npm run package:mac
         env:
