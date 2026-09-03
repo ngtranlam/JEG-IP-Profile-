@@ -15,15 +15,17 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const projectRoot = __dirname.replace('/scripts', '');
+const projectRoot = path.dirname(__dirname);
 const sqlite3Dir = path.join(projectRoot, 'node_modules', 'sqlite3');
 const binaryDir = path.join(sqlite3Dir, 'build', 'Release');
 const binaryPath = path.join(binaryDir, 'node_sqlite3.node');
 
 function main() {
-  // Check if binary already exists
+  // Check if binary already exists.
+  // `file -b` (brief) is used instead of `file` so the output never contains the
+  // path — a path like `.../mac-arm64/...` would otherwise look like an arch.
   if (fs.existsSync(binaryPath)) {
-    const fileInfo = execSync(`file "${binaryPath}"`, { encoding: 'utf-8' }).trim();
+    const fileInfo = execSync(`file -b "${binaryPath}"`, { encoding: 'utf-8' }).trim();
     console.log(`[ensureSqlite3] Binary already exists: ${fileInfo}`);
     return;
   }
@@ -53,7 +55,7 @@ function main() {
       fs.mkdirSync(binaryDir, { recursive: true });
       fs.copyFileSync(downloadedBinary, binaryPath);
 
-      const fileInfo = execSync(`file "${binaryPath}"`, { encoding: 'utf-8' }).trim();
+      const fileInfo = execSync(`file -b "${binaryPath}"`, { encoding: 'utf-8' }).trim();
       console.log(`[ensureSqlite3] Binary installed: ${fileInfo}`);
     } else {
       console.error('[ensureSqlite3] prebuild-install did not produce a binary');
