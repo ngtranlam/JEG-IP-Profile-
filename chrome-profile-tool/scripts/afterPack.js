@@ -169,6 +169,14 @@ function pruneWrongArchBindings(sqlite3Dir, targetArch) {
 
 // --- sharp -------------------------------------------------------------------
 
+/**
+ * sharp can only be repaired BEFORE packing (see scripts/ensureSharp.js): a package
+ * copied into app.asar.unpacked afterwards has no app.asar header entry, and Electron
+ * resolves requires through that header only — so `require('@img/sharp-darwin-x64')`
+ * still throws MODULE_NOT_FOUND even though the files sit on disk.
+ *
+ * Hence this only verifies, and fails the build instead of shipping a broken app.
+ */
 function ensureSharp(targetArch, unpackedModules) {
   if (!fs.existsSync(path.join(unpackedModules, 'sharp'))) {
     console.log('[afterPack] sharp not present in app.asar.unpacked, skipping');
@@ -179,35 +187,18 @@ function ensureSharp(targetArch, unpackedModules) {
   const required = [`sharp-darwin-${targetArch}`, `sharp-libvips-darwin-${targetArch}`];
   const missing = required.filter((pkg) => !fs.existsSync(path.join(imgDir, pkg)));
 
-  if (missing.length === 0) {
-    console.log(`[afterPack] sharp packages for darwin-${targetArch} already present`);
-  } else {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `sharp-${targetArch}-`));
-    try {
-      const specs = missing.map((pkg) => `@img/${pkg}`);
-      console.log(`[afterPack] Installing sharp packages: ${specs.join(', ')}`);
-      // --force is required: npm refuses cpu/os-mismatched optional packages
-      execSync(`npm install --no-save --force --prefix "${tmpDir}" ${specs.join(' ')}`, {
-        stdio: 'inherit',
-      });
-
-      fs.mkdirSync(imgDir, { recursive: true });
-      for (const pkg of missing) {
-        const src = path.join(tmpDir, 'node_modules', '@img', pkg);
-        if (!fs.existsSync(src)) {
-          throw new Error(`[afterPack] npm did not install @img/${pkg}`);
-        }
-        execSync(`cp -R "${src}" "${path.join(imgDir, pkg)}"`, { stdio: 'inherit' });
-        console.log(`[afterPack] Installed @img/${pkg}`);
-      }
-    } finally {
-      try {
-        execSync(`rm -rf "${tmpDir}"`, { stdio: 'ignore' });
-      } catch (e) { /* ignore cleanup errors */ }
-    }
+  if (missing.length > 0) {
+    throw new Error(
+      `[afterPack] Missing sharp packages for darwin-${targetArch}: ` +
+        `${missing.map((p) => `@img/${p}`).join(', ')}\n` +
+        '  These must be in node_modules before packing. Run scripts/ensureSharp.js first ' +
+        '(it is wired into the "package:mac" npm script).'
+    );
   }
+  console.log(`[afterPack] sharp packages present for darwin-${targetArch}`);
 
-  // Drop the other macOS arch to keep the bundle lean and unambiguous
+  // Drop the other macOS arch to keep the bundle lean. Safe: sharp requires only
+  // `@img/sharp-<its own runtime platform>`, never the other arch.
   const otherArch = targetArch === 'arm64' ? 'x64' : 'arm64';
   for (const pkg of [`sharp-darwin-${otherArch}`, `sharp-libvips-darwin-${otherArch}`]) {
     const dir = path.join(imgDir, pkg);

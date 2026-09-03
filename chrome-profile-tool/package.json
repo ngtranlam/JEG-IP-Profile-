@@ -1,6 +1,6 @@
 {
   "name": "chrome-profile-tool",
-  "version": "3.1.0",
+  "version": "3.1.2",
   "description": "JEG Anditect Browser - Anti-Detect Browser for Multi-Account Management",
   "main": "dist/main/main/main.js",
   "homepage": "./",
@@ -13,7 +13,7 @@
     "build:renderer": "vite build",
     "package": "npm run build && electron-builder --config.npmRebuild=false",
     "package:dir": "npm run build && electron-builder --dir --config.npmRebuild=false",
-    "package:mac": "npm run build && node scripts/ensureSqlite3.js && electron-builder --mac --config.npmRebuild=false",
+    "package:mac": "npm run build && node scripts/ensureSqlite3.js && node scripts/ensureSharp.js && electron-builder --mac --config.npmRebuild=false",
     "package:win": "npm run build && electron-builder --win --config.npmRebuild=false",
     "test": "jest",
     "lint": "eslint src --ext .ts,.tsx",
